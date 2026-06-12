@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tralog</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%F0%9F%8F%8B%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
@@ -61,16 +62,24 @@
 
   .container { max-width: 1080px; margin: 0 auto; padding: 0 20px 20px; }
 
-  header.app-header {
+  /* ===== 固定ヘッダー（ブランド + タブ） ===== */
+  .app-top {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 22px 0 14px;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
   .brand {
-    font-size: clamp(26px, 4vw, 34px);
+    font-size: clamp(24px, 4vw, 30px);
     font-weight: 900;
     letter-spacing: -0.02em;
+    align-self: center;
+    padding: 12px 0;
     line-height: 1.1;
     background: linear-gradient(120deg, var(--primary), #5fa0e8);
     -webkit-background-clip: text;
@@ -78,11 +87,10 @@
     color: transparent;
   }
 
-  /* タブナビ（モジュールごとに自動生成） */
+  /* タブナビ（モジュールごとに自動生成・アイコン表示） */
   .tabbar {
     display: flex;
     gap: 2px;
-    border-bottom: 1px solid var(--border);
     overflow-x: auto;
   }
   .tabbar button {
@@ -90,18 +98,20 @@
     border: none;
     background: transparent;
     color: var(--muted);
-    font-size: 14px;
-    font-weight: 700;
-    padding: 12px 14px;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.15s;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 14px 6px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
   }
+  .tabbar button .tab-ico { font-size: 20px; line-height: 1.2; }
+  .tabbar button .tab-lbl { font-size: 11px; font-weight: 700; }
   .tabbar button:hover { color: var(--text); }
   .tabbar button.active { color: var(--primary); border-bottom-color: var(--primary); }
   .tabbar button .soon { font-size: 10px; opacity: 0.8; font-weight: 600; }
@@ -125,7 +135,6 @@
   .hero-msg { color: var(--muted); font-size: 14px; margin-top: 2px; }
   .hero-stats { display: flex; flex-wrap: wrap; gap: 14px 0; margin-top: 18px; }
   .hero-stat { padding: 0 22px; border-left: 1px solid var(--border); min-width: 120px; }
-  .hero-stat:first-child { border-left: none; padding-left: 0; }
   .hs-lbl { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
   .hs-val { font-size: 30px; font-weight: 900; line-height: 1.2; }
   .hs-val small { font-size: 13px; font-weight: 700; color: var(--muted); }
@@ -314,7 +323,6 @@
   .chart-wrap.sm { height: 200px; }
   .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px 0; margin: 14px 0; }
   .stat-card { background: none; border: none; border-radius: 0; border-left: 1px solid var(--border); padding: 2px 16px; }
-  .stat-card:first-child { border-left: none; padding-left: 0; }
   .stat-card .lbl { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
   .stat-card .val { font-size: 22px; font-weight: 800; margin-top: 2px; }
   .stat-card .val small { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -367,7 +375,10 @@
   /* ===== スマホ最適化 ===== */
   @media (max-width: 600px) {
     .container { padding: 0 12px 16px; }
-    header.app-header { padding: 16px 0 10px; }
+    .brand { font-size: 22px; padding: 10px 0; }
+    .tabbar button { padding: 6px 10px 5px; }
+    .tabbar button .tab-ico { font-size: 18px; }
+    .tabbar button .tab-lbl { font-size: 10px; }
     .panel { padding: 18px 0; }
     .cal-grid { gap: 3px; }
     .cal-cell { min-height: 52px; padding: 4px; border-radius: 9px; }
@@ -392,11 +403,10 @@
 </head>
 <body>
 <div class="container">
-  <header class="app-header">
+  <div class="app-top">
     <div class="brand">Tralog</div>
-  </header>
-
-  <nav class="tabbar" id="tabbar"></nav>
+    <nav class="tabbar" id="tabbar"></nav>
+  </div>
 
   <main id="view"></main>
 
@@ -532,20 +542,41 @@ const Charts = (() => {
     config.options.scales = config.options.scales || {};
     for (const ax of ['x', 'y', 'y1']) if (config.options.scales[ax]) Object.assign(config.options.scales[ax], { ticks: { color: cssVar('--muted'), ...(config.options.scales[ax].ticks || {}) }, grid: { color: gridColor(), ...(config.options.scales[ax].grid || {}) } });
     instances[canvasId] = new Chart(ctx, config);
+    if (config.type === 'line') autoPoints(instances[canvasId]);
     return instances[canvasId];
   }
   function get(canvasId) { return instances[canvasId]; }
-  function resetZoom(canvasId) { const c = instances[canvasId]; if (c && c.resetZoom) c.resetZoom(); }
+  // 「全体」ボタン用: 初期表示が絞られていても全期間を表示する
+  function resetZoom(canvasId) {
+    const c = instances[canvasId];
+    if (!c) return;
+    if (c.options.scales && c.options.scales.x) { c.options.scales.x.min = undefined; c.options.scales.x.max = undefined; }
+    c.update();
+    autoPoints(c);
+  }
   return { draw, get, resetZoom };
 })();
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'; }
 // 折れ線グラフ共通: ピンチ/ホイールで拡大・ドラッグで移動
-function zoomOpts() {
+// maxIndex を渡すと全データ範囲までパン可能（初期表示を絞っている場合用）
+function zoomOpts(maxIndex) {
+  const limits = { x: { minRange: 2 } };
+  if (Number.isFinite(maxIndex)) { limits.x.min = 0; limits.x.max = maxIndex; }
   return {
-    pan: { enabled: true, mode: 'x' },
-    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
-    limits: { x: { minRange: 2 } },
+    pan: { enabled: true, mode: 'x', onPanComplete: ({ chart }) => autoPoints(chart) },
+    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x', onZoomComplete: ({ chart }) => autoPoints(chart) },
+    limits,
   };
+}
+// 表示中のデータ点が30以上ならポイントマーカーを消して見やすくする
+function autoPoints(chart) {
+  const x = chart.scales && chart.scales.x;
+  if (!x || chart.config.type !== 'line') return;
+  const visible = Math.ceil(x.max) - Math.floor(x.min) + 1;
+  const r = visible >= 30 ? 0 : 3;
+  let changed = false;
+  chart.data.datasets.forEach(ds => { if (ds.pointRadius !== r) { ds.pointRadius = r; changed = true; } });
+  if (changed) chart.update('none');
 }
 
 /* ---------------- CSV 書き出し ---------------- */
@@ -611,7 +642,7 @@ const App = (() => {
     modules.forEach(mod => {
       const btn = document.createElement('button');
       btn.className = 'tab' + (mod.id === active ? ' active' : '');
-      btn.innerHTML = `<span>${mod.icon || ''}</span><span>${mod.label}</span>` +
+      btn.innerHTML = `<span class="tab-ico">${mod.icon || ''}</span><span class="tab-lbl">${mod.label}</span>` +
         (mod.comingSoon ? ' <span class="soon">準備中</span>' : '');
       btn.onclick = () => activate(mod.id);
       tabbar.appendChild(btn);
@@ -884,7 +915,6 @@ const WorkoutModule = (() => {
       <div class="cal-grid">${cells}</div>
       <div class="legend">${legend}</div>
       <div class="toolbar">
-        <button class="btn ghost sm" id="manageMenusBtn">⚙️ オリジナルメニュー管理</button>
         <button class="btn ghost sm" id="exportBtn">⬇️ CSV書き出し</button>
       </div>
     `;
@@ -896,7 +926,6 @@ const WorkoutModule = (() => {
       selectedKey = dateKey(new Date());
       renderCalendar();
     };
-    panel.querySelector('#manageMenusBtn').onclick = openMenuManager;
     panel.querySelector('#exportBtn').onclick = exportData;
     panel.querySelectorAll('.cal-cell[data-key]').forEach(cell => bindCellGestures(cell));
   }
@@ -1315,92 +1344,6 @@ const WorkoutModule = (() => {
     if (editing) renderDetail();
   }
 
-  /* ============ オリジナルメニュー管理 ============ */
-  function openMenuManager() {
-    let cat = 'chest';
-    Modal.open({
-      title: '⚙️ オリジナルメニュー管理',
-      saveLabel: '',
-      onSave: null,
-      bodyHTML: `
-        <div class="field">
-          <label class="field-label">カテゴリー</label>
-          <div class="cat-chips" id="mmCat"></div>
-        </div>
-        <div class="field">
-          <label class="field-label">新しいメニューを追加</label>
-          <div style="display:flex; gap:8px;">
-            <input id="mmName" placeholder="例: インクラインケーブルフライ">
-            <select id="mmType" style="width:130px;">
-              <option value="strength">重量×回数</option>
-              <option value="cardio">時間・距離</option>
-            </select>
-            <button class="btn" id="mmAdd" style="white-space:nowrap;">追加</button>
-          </div>
-        </div>
-        <div class="section-title">登録済みオリジナルメニュー</div>
-        <div id="mmList"></div>
-      `,
-    });
-    const body = Modal.body;
-    const catBox = body.querySelector('#mmCat');
-    const listBox = body.querySelector('#mmList');
-    const typeSel = body.querySelector('#mmType');
-
-    catBox.innerHTML = CATEGORIES.map(c =>
-      `<button class="cat-chip ${c.id === cat ? 'active' : ''}" data-cat="${c.id}">
-        <span class="cat-badge" style="background:${c.color}"></span>${c.name}</button>`
-    ).join('');
-    catBox.querySelectorAll('[data-cat]').forEach(ch => ch.onclick = () => {
-      cat = ch.dataset.cat;
-      catBox.querySelectorAll('.cat-chip').forEach(x => x.classList.toggle('active', x === ch));
-      resetForm();
-      typeSel.value = cat === 'cardio' ? 'cardio' : 'strength';
-      renderList();
-    });
-
-    let editId = null;
-    const nameInput = body.querySelector('#mmName');
-    const addBtn = body.querySelector('#mmAdd');
-
-    function renderList() {
-      const customs = state.customMenus.filter(m => m.category === cat);
-      if (!customs.length) { listBox.innerHTML = `<p class="hint">このカテゴリーのオリジナルメニューはまだありません。</p>`; return; }
-      listBox.innerHTML = customs.map(m => `
-        <div class="custom-menu-row">
-          <div class="info"><span class="cat-badge" style="background:${catById(m.category).color}"></span>
-            ${escapeHTML(m.name)} <span class="menu-item tag" style="border:none;background:none;padding:0;">${m.type === 'cardio' ? '時間・距離' : '重量×回数'}</span></div>
-          <span class="ex-actions"><button class="link-btn" data-edit="${m.id}">編集</button><button class="link-btn del" data-rm="${m.id}">削除</button></span>
-        </div>`).join('');
-      listBox.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
-        state.customMenus = state.customMenus.filter(x => x.id !== b.dataset.rm);
-        Store.save(); if (editId === b.dataset.rm) resetForm(); renderList(); toast('削除しました');
-      });
-      listBox.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
-        const m = state.customMenus.find(x => x.id === b.dataset.edit);
-        editId = m.id; nameInput.value = m.name; typeSel.value = m.type; addBtn.textContent = '更新'; nameInput.focus();
-      });
-    }
-    function resetForm() { editId = null; nameInput.value = ''; addBtn.textContent = '追加'; }
-
-    addBtn.onclick = () => {
-      const name = nameInput.value.trim();
-      if (!name) { toast('メニュー名を入力してください'); return; }
-      if (editId) {
-        const m = state.customMenus.find(x => x.id === editId);
-        if (m) { m.name = name; m.type = typeSel.value; }
-        toast('更新しました');
-      } else {
-        state.customMenus.push({ id: 'c_' + uid(), category: cat, name, type: typeSel.value, builtin: false });
-        toast('追加しました');
-      }
-      Store.save(); resetForm(); renderList();
-    };
-
-    typeSel.value = cat === 'cardio' ? 'cardio' : 'strength';
-    renderList();
-  }
-
   /* ============ データ書き出し（CSV） ============ */
   function exportData() {
     const headers = ['日付', 'カテゴリー', 'メニュー', '種別', 'セット', '重量(kg)', '回数', '時間(分)', '距離(km)', '強度', 'メモ'];
@@ -1624,21 +1567,43 @@ const BodyModule = (() => {
     return `<div class="stat-card"><div class="lbl">${f.label}</div><div class="val">${v ?? '-'}<small> ${f.unit}</small></div>${deltaHTML}</div>`;
   }
 
+  // 直近1ヶ月の開始インデックス（初期表示ウィンドウ用）
+  function monthStartIndex(pts) {
+    const cut = new Date(); cut.setMonth(cut.getMonth() - 1);
+    const cutKey = dateKey(cut);
+    const idx = pts.findIndex(r => r.date >= cutKey);
+    return idx > 0 ? idx : undefined;
+  }
+
+  function lineOpts(pts, extraScales = {}) {
+    return {
+      interaction: { mode: 'index', intersect: false },
+      plugins: { zoom: zoomOpts(pts.length - 1) },
+      scales: {
+        x: { min: monthStartIndex(pts), ticks: { maxTicksLimit: 8, maxRotation: 0, autoSkip: true } },
+        ...extraScales,
+      },
+    };
+  }
+
   function drawCharts(recs) {
     if (!recs.length) return;
     const labels = recs.map(r => fmtMonthDay(r.date));
     Charts.draw('bWeightChart', {
       type: 'line',
-      data: { labels, datasets: [{ label: '体重(kg)', data: recs.map(r => r.weight ?? null), borderColor: cssVar('--primary'), backgroundColor: 'rgba(50,102,173,0.12)', fill: true, tension: 0.3, spanGaps: true, pointRadius: 3 }] },
-      options: { plugins: { zoom: zoomOpts() }, scales: { y: {} } },
+      data: { labels, datasets: [{ label: '体重(kg)', data: recs.map(r => r.weight ?? null), borderColor: cssVar('--primary'), backgroundColor: 'rgba(50,102,173,0.12)', fill: true, tension: 0.3, spanGaps: true, borderWidth: 2 }] },
+      options: lineOpts(recs, { y: {} }),
     });
     Charts.draw('bCompChart', {
       type: 'line',
       data: { labels, datasets: [
-        { label: '体脂肪率(%)', data: recs.map(r => r.bodyFat ?? null), borderColor: cssVar('--danger'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y', spanGaps: true },
-        { label: '骨格筋量(kg)', data: recs.map(r => r.smm ?? null), borderColor: cssVar('--success'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y1', spanGaps: true },
+        { label: '体脂肪率(%)', data: recs.map(r => r.bodyFat ?? null), borderColor: cssVar('--danger'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y', spanGaps: true, borderWidth: 2 },
+        { label: '骨格筋量(kg)', data: recs.map(r => r.smm ?? null), borderColor: cssVar('--success'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y1', spanGaps: true, borderWidth: 2 },
       ] },
-      options: { plugins: { zoom: zoomOpts() }, scales: { y: { position: 'left', title: { display: true, text: '%', color: cssVar('--muted') } }, y1: { position: 'right', title: { display: true, text: 'kg', color: cssVar('--muted') }, grid: { drawOnChartArea: false } } } },
+      options: lineOpts(recs, {
+        y: { position: 'left', title: { display: true, text: '%', color: cssVar('--muted') } },
+        y1: { position: 'right', title: { display: true, text: 'kg', color: cssVar('--muted') }, grid: { drawOnChartArea: false } },
+      }),
     });
   }
 
@@ -1653,9 +1618,9 @@ const BodyModule = (() => {
         label: `${f.label}${f.unit ? '(' + f.unit + ')' : ''}`,
         data: pts.map(r => r[f.key]),
         borderColor: cssVar('--cat-glute'), backgroundColor: 'rgba(181,83,156,0.10)',
-        fill: true, tension: 0.3, pointRadius: 3,
+        fill: true, tension: 0.3, borderWidth: 2,
       }] },
-      options: { plugins: { zoom: zoomOpts() }, scales: { y: {} } },
+      options: lineOpts(pts, { y: {} }),
     });
   }
 
