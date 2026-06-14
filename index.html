@@ -115,6 +115,19 @@
   .tabbar button:hover { color: var(--text); }
   .tabbar button.active { color: var(--primary); border-bottom-color: var(--primary); }
   .tabbar button .soon { font-size: 10px; opacity: 0.8; font-weight: 600; }
+  .account-btn {
+    align-self: center;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 800;
+    padding: 7px 11px;
+    white-space: nowrap;
+  }
+  .account-btn:hover { border-color: var(--primary); color: var(--primary); }
 
   .module-view { animation: fade 0.2s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -300,6 +313,14 @@
   /* オリジナルメニュー管理 */
   .custom-menu-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); margin-bottom: 8px; }
   .custom-menu-row .info { display: flex; align-items: center; gap: 8px; }
+  .routine-list { display: grid; gap: 10px; margin-top: 12px; }
+  .routine-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-left: 1px solid var(--border); padding: 8px 0 8px 14px; }
+  .routine-title { font-weight: 800; }
+  .routine-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .routine-editor { display: grid; gap: 10px; }
+  .routine-ex-row { border-left: 1px solid var(--border); padding-left: 12px; display: grid; gap: 8px; }
+  .routine-ex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 520px) { .routine-ex-grid { grid-template-columns: 1fr; } .routine-row { align-items: flex-start; flex-direction: column; } }
 
   .placeholder-card { text-align: center; padding: 50px 20px; }
   .placeholder-card .big { font-size: 44px; margin-bottom: 12px; }
@@ -340,6 +361,18 @@
   .trend-chip.down { color: var(--danger); border-color: rgba(226,75,74,0.4); }
   .trend-chip.flat { color: var(--muted); }
 
+  /* ===== AIトレーナー / 写真推定 ===== */
+  .chat-box { display: grid; gap: 12px; }
+  .chat-msg { max-width: 86%; border-left: 3px solid var(--border); padding: 8px 0 8px 12px; }
+  .chat-msg.user { justify-self: end; border-left: none; border-right: 3px solid var(--primary); padding: 8px 12px 8px 0; text-align: right; }
+  .chat-msg .role { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+  .chat-msg .text { margin-top: 2px; white-space: pre-wrap; }
+  .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chat-input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 14px; }
+  .sync-pill { display: inline-flex; gap: 6px; align-items: center; border-left: 1px solid var(--border); padding-left: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
+  .photo-preview { max-width: 100%; border-radius: 12px; margin: 8px 0; border: 1px solid var(--border); }
+  .estimate-box { border-left: 3px solid var(--warning); padding: 6px 0 6px 12px; margin-top: 10px; }
+
   .range-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .range-toggle button { border: none; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 700; padding: 7px 12px; cursor: pointer; }
   .range-toggle button.active { background: var(--primary); color: #fff; }
@@ -379,6 +412,8 @@
     .tabbar button { padding: 6px 10px 5px; }
     .tabbar button .tab-ico { font-size: 18px; }
     .tabbar button .tab-lbl { font-size: 10px; }
+    .account-btn { padding: 6px 9px; font-size: 12px; }
+    .chat-input-row { grid-template-columns: 1fr; }
     .panel { padding: 18px 0; }
     .cal-grid { gap: 3px; }
     .cal-cell { min-height: 52px; padding: 4px; border-radius: 9px; }
@@ -406,6 +441,7 @@
   <div class="app-top">
     <div class="brand">Tralog</div>
     <nav class="tabbar" id="tabbar"></nav>
+    <button class="account-btn" id="accountBtn">👤</button>
   </div>
 
   <main id="view"></main>
@@ -568,14 +604,36 @@ function zoomOpts(maxIndex) {
     limits,
   };
 }
+function edgeXTicks(count) {
+  return {
+    maxRotation: 0,
+    autoSkip: false,
+    callback(value) {
+      const x = this.chart.scales.x;
+      const min = Math.ceil(x.min ?? 0);
+      const max = Math.floor(x.max ?? (count - 1));
+      return value === min || value === max ? this.getLabelForValue(value) : '';
+    },
+  };
+}
 // 表示中のデータ点が30以上ならポイントマーカーを消して見やすくする
 function autoPoints(chart) {
   const x = chart.scales && chart.scales.x;
   if (!x || chart.config.type !== 'line') return;
   const visible = Math.ceil(x.max) - Math.floor(x.min) + 1;
-  const r = visible >= 30 ? 0 : 3;
+  const r = visible >= 30 ? 0 : 4;
+  const hr = visible >= 30 ? 4 : 7;
+  const bw = visible >= 30 ? 0 : 2;
   let changed = false;
-  chart.data.datasets.forEach(ds => { if (ds.pointRadius !== r) { ds.pointRadius = r; changed = true; } });
+  chart.data.datasets.forEach(ds => {
+    if (ds.pointRadius !== r || ds.pointHoverRadius !== hr || ds.pointBorderWidth !== bw) {
+      ds.pointRadius = r;
+      ds.pointHoverRadius = hr;
+      ds.pointBorderWidth = bw;
+      ds.pointBackgroundColor = cssVar('--surface');
+      changed = true;
+    }
+  });
   if (changed) chart.update('none');
 }
 
@@ -624,6 +682,99 @@ const Modal = (() => {
 
   saveBtn.onclick = () => { if (onSave && onSave(bodyEl) !== false) close(); };
   return { open, close, get body() { return bodyEl; } };
+})();
+
+/* =====================================================================
+ *  User Settings: アカウント紐付け/初期設定（モック）
+ *  後でSupabase/Firebaseに差し替えやすいよう、ユーザー情報を独立namespaceで管理
+ * ===================================================================== */
+const UserSettings = (() => {
+  const state = Store.ns('user', {
+    account: { email: '', displayName: '', syncId: '' },
+    profile: { heightCm: '', age: '', sex: '', goal: '筋肉を増やす', activity: '週2-3回' },
+    setupDone: false,
+  });
+
+  function init() {
+    const btn = document.getElementById('accountBtn');
+    if (btn) {
+      btn.onclick = () => openSettings(false);
+      renderButton();
+    }
+    if (!state.setupDone) setTimeout(() => openSettings(true), 400);
+  }
+
+  function renderButton() {
+    const btn = document.getElementById('accountBtn');
+    if (!btn) return;
+    btn.textContent = state.account.email ? '👤 同期' : '👤 設定';
+    btn.title = state.account.email ? `同期ID: ${state.account.syncId}` : '初期設定・アカウント紐付け';
+  }
+
+  function syncId(email) {
+    if (!email) return '';
+    let h = 0;
+    for (let i = 0; i < email.length; i++) h = ((h << 5) - h + email.charCodeAt(i)) | 0;
+    return 'TL-' + Math.abs(h).toString(36).toUpperCase().padStart(6, '0').slice(0, 6);
+  }
+
+  function openSettings(isInitial = false) {
+    Modal.open({
+      title: isInitial ? '初期設定' : 'アカウント・プロフィール',
+      saveLabel: '保存',
+      bodyHTML: `
+        <div class="field">
+          <label class="field-label">アカウント紐付け（モック）</label>
+          <input id="uEmail" type="email" placeholder="メールアドレス" value="${escapeHTML(state.account.email || '')}">
+          <p class="hint">今は端末内保存です。後でクラウド同期を接続する時、このメールアドレス/同期IDに紐付けます。</p>
+        </div>
+        <div class="pfc-grid" style="grid-template-columns:1fr 1fr;">
+          <div class="field"><label class="hint">表示名</label><input id="uName" value="${escapeHTML(state.account.displayName || '')}" placeholder="例: Daisuke"></div>
+          <div class="field"><label class="hint">身長(cm)</label><input id="uHeight" type="number" step="0.1" value="${state.profile.heightCm || ''}" placeholder="170"></div>
+          <div class="field"><label class="hint">年齢</label><input id="uAge" type="number" value="${state.profile.age || ''}" placeholder="30"></div>
+          <div class="field"><label class="hint">性別</label>
+            <select id="uSex">
+              ${['', '男性', '女性', 'その他'].map(v => `<option value="${v}" ${state.profile.sex === v ? 'selected' : ''}>${v || '未設定'}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label class="hint">目標</label>
+            <select id="uGoal">
+              ${['筋肉を増やす', '体脂肪を落とす', '体力をつける', '健康維持', '大会・イベントに向ける'].map(v => `<option ${state.profile.goal === v ? 'selected' : ''}>${v}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label class="hint">運動頻度</label>
+            <select id="uActivity">
+              ${['週1回以下', '週2-3回', '週4-5回', '週6回以上'].map(v => `<option ${state.profile.activity === v ? 'selected' : ''}>${v}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="estimate-box">
+          <b>同期ステータス</b><br>
+          <span class="hint">Mock mode: 画面と保存構造のみ。実同期はSupabase/Firebase接続時に有効化します。</span>
+          <div id="syncIdPreview" class="sync-pill" style="margin-top:8px;">同期ID: ${state.account.syncId || '-'}</div>
+        </div>`,
+      onSave: (body) => {
+        const email = body.querySelector('#uEmail').value.trim();
+        state.account.email = email;
+        state.account.displayName = body.querySelector('#uName').value.trim();
+        state.account.syncId = syncId(email);
+        state.profile.heightCm = numOrNull(body.querySelector('#uHeight').value) || '';
+        state.profile.age = numOrNull(body.querySelector('#uAge').value) || '';
+        state.profile.sex = body.querySelector('#uSex').value;
+        state.profile.goal = body.querySelector('#uGoal').value;
+        state.profile.activity = body.querySelector('#uActivity').value;
+        state.setupDone = true;
+        Store.save();
+        renderButton();
+        toast('プロフィールを保存しました');
+      },
+    });
+    const email = Modal.body.querySelector('#uEmail');
+    const preview = Modal.body.querySelector('#syncIdPreview');
+    email.oninput = () => preview.textContent = `同期ID: ${syncId(email.value.trim()) || '-'}`;
+  }
+
+  return { init, get state() { return state; }, openSettings };
 })();
 
 /* =====================================================================
@@ -738,6 +889,7 @@ function builtinMenus(catId) {
  * ===================================================================== */
 const WorkoutModule = (() => {
   const state = Store.ns('workout', { records: {}, customMenus: [] });
+  if (!state.routines) state.routines = [];
   let viewMonth = new Date(); viewMonth.setDate(1);
   let selectedKey = dateKey(new Date());
   let rootEl = null;
@@ -811,10 +963,12 @@ const WorkoutModule = (() => {
     el.innerHTML = `
       <div class="panel" id="heroPanel"></div>
       <div class="panel" id="calPanel"></div>
+      <div class="panel" id="routinePanel"></div>
       <div class="panel" id="statsPanel"></div>
     `;
     renderHero();
     renderCalendar();
+    renderRoutines();
     renderStats();
   }
 
@@ -1032,6 +1186,182 @@ const WorkoutModule = (() => {
       </div>`;
   }
 
+  /* ============ 描画: ルーティンメニュー ============ */
+  function renderRoutines() {
+    const panel = rootEl.querySelector('#routinePanel');
+    const rows = state.routines.map(rt => `
+      <div class="routine-row">
+        <div>
+          <div class="routine-title">${escapeHTML(rt.name)}</div>
+          <div class="routine-meta">${rt.items.length}種目 ・ ${rt.items.map(i => escapeHTML(i.menuName)).join(' / ')}</div>
+        </div>
+        <div class="ex-actions">
+          <button class="btn sm" data-use-routine="${rt.id}">今日に追加</button>
+          <button class="link-btn" data-edit-routine="${rt.id}">編集</button>
+          <button class="link-btn del" data-del-routine="${rt.id}">削除</button>
+        </div>
+      </div>`).join('');
+
+    panel.innerHTML = `
+      <div class="stats-head">
+        <h2 style="font-size:16px;">ルーティンメニュー</h2>
+        <button class="btn ghost sm" id="addRoutineBtn">＋ ルーティン作成</button>
+      </div>
+      ${state.routines.length ? `<div class="routine-list">${rows}</div>` : `<p class="hint">よく行う組み合わせを登録すると、今日の記録へまとめて追加できます。</p>`}`;
+
+    panel.querySelector('#addRoutineBtn').onclick = () => openRoutineModal(null);
+    panel.querySelectorAll('[data-use-routine]').forEach(b => b.onclick = () => applyRoutine(b.dataset.useRoutine));
+    panel.querySelectorAll('[data-edit-routine]').forEach(b => b.onclick = () => openRoutineModal(b.dataset.editRoutine));
+    panel.querySelectorAll('[data-del-routine]').forEach(b => b.onclick = () => {
+      if (!confirm('このルーティンを削除しますか？')) return;
+      state.routines = state.routines.filter(r => r.id !== b.dataset.delRoutine);
+      Store.save();
+      renderRoutines();
+      toast('削除しました');
+    });
+  }
+
+  function applyRoutine(id) {
+    const rt = state.routines.find(r => r.id === id);
+    if (!rt || !rt.items.length) return;
+    const key = dateKey(new Date());
+    rt.items.forEach(item => {
+      const rec = {
+        id: uid(),
+        category: item.category,
+        menuId: item.menuId,
+        menuName: item.menuName,
+        type: item.type,
+        memo: `Routine: ${rt.name}`,
+      };
+      if (item.type === 'cardio') {
+        rec.duration = item.duration ?? null;
+        rec.distance = item.distance ?? null;
+        rec.intensity = item.intensity || '';
+      } else {
+        const count = Math.max(1, Number(item.setCount || 3));
+        rec.sets = Array.from({ length: count }, () => ({
+          weight: item.weight ?? null,
+          reps: item.reps ?? null,
+        }));
+      }
+      addRecord(key, rec);
+    });
+    selectedKey = key;
+    renderHero(); renderCalendar(); renderStats();
+    toast(`${rt.name}を今日の記録に追加しました`);
+  }
+
+  function openRoutineModal(editId) {
+    const editing = editId ? state.routines.find(r => r.id === editId) : null;
+    Modal.open({
+      title: editing ? 'ルーティンを編集' : 'ルーティンを作成',
+      saveLabel: editing ? '更新' : '保存',
+      bodyHTML: `
+        <div class="field">
+          <label class="field-label">ルーティン名</label>
+          <input id="routineName" placeholder="例: Push Day / 脚の日" value="${editing ? escapeHTML(editing.name) : ''}">
+        </div>
+        <div class="routine-editor" id="routineEditor"></div>
+        <button type="button" class="btn ghost sm" id="routineAddExercise">＋ 種目を追加</button>`,
+      onSave: (body) => {
+        const name = body.querySelector('#routineName').value.trim();
+        if (!name) { toast('ルーティン名を入力してください'); return false; }
+        const items = [...body.querySelectorAll('.routine-ex-row')].map(row => routineRowToItem(row)).filter(Boolean);
+        if (!items.length) { toast('種目を1つ以上追加してください'); return false; }
+        const next = { id: editing?.id || uid(), name, items, updatedAt: new Date().toISOString() };
+        if (editing) {
+          const idx = state.routines.findIndex(r => r.id === editing.id);
+          state.routines[idx] = next;
+        } else {
+          state.routines.push(next);
+        }
+        Store.save();
+        renderRoutines();
+        toast(editing ? 'ルーティンを更新しました' : 'ルーティンを保存しました');
+      },
+    });
+
+    const editor = Modal.body.querySelector('#routineEditor');
+    const initial = editing?.items?.length ? editing.items : [{ category: 'chest', type: 'strength', setCount: 3, reps: 10 }];
+    initial.forEach(item => addRoutineRow(editor, item));
+    Modal.body.querySelector('#routineAddExercise').onclick = () => addRoutineRow(editor, { category: 'chest', type: 'strength', setCount: 3, reps: 10 });
+  }
+
+  function addRoutineRow(editor, item) {
+    const row = document.createElement('div');
+    row.className = 'routine-ex-row';
+    row.innerHTML = `
+      <div class="routine-ex-grid">
+        <div><label class="hint">カテゴリー</label><select class="rt-cat"></select></div>
+        <div><label class="hint">メニュー</label><select class="rt-menu"></select></div>
+      </div>
+      <div class="routine-detail"></div>
+      <button type="button" class="link-btn del" style="justify-self:start;">この種目を削除</button>`;
+    editor.appendChild(row);
+
+    const cat = row.querySelector('.rt-cat');
+    cat.innerHTML = CATEGORIES.map(c => `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.name}</option>`).join('');
+    cat.onchange = () => { fillRoutineMenus(row); renderRoutineDetail(row); };
+    row.querySelector('.del').onclick = () => row.remove();
+    fillRoutineMenus(row, item);
+    renderRoutineDetail(row, item);
+  }
+
+  function fillRoutineMenus(row, item = {}) {
+    const catId = row.querySelector('.rt-cat').value;
+    const menu = row.querySelector('.rt-menu');
+    const menus = menusOf(catId);
+    menu.innerHTML = menus.map(m => `<option value="${m.id}" ${m.id === item.menuId ? 'selected' : ''}>${escapeHTML(m.name)}</option>`).join('');
+    menu.onchange = () => renderRoutineDetail(row);
+  }
+
+  function routineMenuFromRow(row) {
+    const catId = row.querySelector('.rt-cat').value;
+    const menuId = row.querySelector('.rt-menu').value;
+    return menusOf(catId).find(m => m.id === menuId);
+  }
+
+  function renderRoutineDetail(row, item = {}) {
+    const menu = routineMenuFromRow(row);
+    const detail = row.querySelector('.routine-detail');
+    if (!menu) { detail.innerHTML = ''; return; }
+    if (menu.type === 'cardio') {
+      detail.innerHTML = `
+        <div class="routine-ex-grid">
+          <div><label class="hint">時間(分)</label><input class="rt-duration" type="number" min="0" value="${item.duration ?? ''}" placeholder="30"></div>
+          <div><label class="hint">距離(km)</label><input class="rt-distance" type="number" min="0" step="0.1" value="${item.distance ?? ''}" placeholder="5.0"></div>
+        </div>
+        <div style="margin-top:8px;"><label class="hint">強度</label><select class="rt-intensity">
+          ${['', '低', '中', '高'].map(v => `<option value="${v}" ${item.intensity === v ? 'selected' : ''}>${v || '—'}</option>`).join('')}
+        </select></div>`;
+    } else {
+      detail.innerHTML = `
+        <div class="routine-ex-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div><label class="hint">セット数</label><input class="rt-set-count" type="number" min="1" value="${item.setCount ?? 3}"></div>
+          <div><label class="hint">重量(kg)</label><input class="rt-weight" type="number" min="0" step="0.5" value="${item.weight ?? ''}" placeholder="任意"></div>
+          <div><label class="hint">回数</label><input class="rt-reps" type="number" min="0" value="${item.reps ?? 10}"></div>
+        </div>`;
+    }
+  }
+
+  function routineRowToItem(row) {
+    const catId = row.querySelector('.rt-cat').value;
+    const menu = routineMenuFromRow(row);
+    if (!menu) return null;
+    const item = { category: catId, menuId: menu.id, menuName: menu.name, type: menu.type };
+    if (menu.type === 'cardio') {
+      item.duration = numOrNull(row.querySelector('.rt-duration')?.value);
+      item.distance = numOrNull(row.querySelector('.rt-distance')?.value);
+      item.intensity = row.querySelector('.rt-intensity')?.value || '';
+    } else {
+      item.setCount = numOrNull(row.querySelector('.rt-set-count')?.value) || 3;
+      item.weight = numOrNull(row.querySelector('.rt-weight')?.value);
+      item.reps = numOrNull(row.querySelector('.rt-reps')?.value) || 10;
+    }
+    return item;
+  }
+
   /* ============ 描画: 種目別 分析 ============ */
   function renderStats() {
     const panel = rootEl.querySelector('#statsPanel');
@@ -1087,7 +1417,7 @@ const WorkoutModule = (() => {
           { label: '時間(分)', data: dur, borderColor: cssVar('--primary'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y', spanGaps: true },
           { label: '距離(km)', data: dist, borderColor: cssVar('--cat-back'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y1', spanGaps: true },
         ] },
-        options: { plugins: { zoom: zoomOpts() }, scales: { y: { position: 'left', title: { display: true, text: '分', color: cssVar('--muted') } }, y1: { position: 'right', title: { display: true, text: 'km', color: cssVar('--muted') }, grid: { drawOnChartArea: false } } } },
+        options: { plugins: { zoom: zoomOpts(labels.length - 1) }, scales: { x: { ticks: edgeXTicks(labels.length) }, y: { position: 'left', title: { display: true, text: '分', color: cssVar('--muted') } }, y1: { position: 'right', title: { display: true, text: 'km', color: cssVar('--muted') }, grid: { drawOnChartArea: false } } } },
       };
       tableHTML = `<table class="data-table"><thead><tr><th>日付</th><th>時間(分)</th><th>距離(km)</th><th>強度</th></tr></thead>
         <tbody>${[...recs].reverse().map(r => `<tr><td>${fmtMonthDay(r.date)}</td><td>${r.duration ?? '-'}</td><td>${r.distance ?? '-'}</td><td>${r.intensity || '-'}</td></tr>`).join('')}</tbody></table>`;
@@ -1107,7 +1437,7 @@ const WorkoutModule = (() => {
           { label: '最大重量(kg)', data: maxW, borderColor: cssVar('--primary'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y', spanGaps: true },
           { label: 'ボリューム(kg)', data: vol, borderColor: cssVar('--cat-glute'), backgroundColor: 'transparent', borderDash: [5, 4], tension: 0.3, yAxisID: 'y1', spanGaps: true },
         ] },
-        options: { plugins: { zoom: zoomOpts() }, scales: { y: { position: 'left', title: { display: true, text: 'kg', color: cssVar('--muted') } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } },
+        options: { plugins: { zoom: zoomOpts(labels.length - 1) }, scales: { x: { ticks: edgeXTicks(labels.length) }, y: { position: 'left', title: { display: true, text: 'kg', color: cssVar('--muted') } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } },
       };
       tableHTML = `<table class="data-table"><thead><tr><th>日付</th><th>最大重量</th><th>ボリューム</th><th>セット詳細</th></tr></thead>
         <tbody>${[...recs].reverse().map((r, i) => {
@@ -1365,7 +1695,15 @@ const WorkoutModule = (() => {
     toast('CSVを書き出しました');
   }
 
-  return { id: 'workout', label: 'トレーニング記録', icon: '🏋️', render };
+  function summary() {
+    const dates = Object.keys(state.records).sort();
+    const latest = dates[dates.length - 1];
+    const totalRecords = Object.values(state.records).reduce((a, list) => a + list.length, 0);
+    const volume = Object.values(state.records).flat().reduce((sum, r) => sum + (r.sets || []).reduce((a, s) => a + (s.weight || 0) * (s.reps || 0), 0), 0);
+    return { latest, totalRecords, volume: round(volume, 0), menus: loggedMenus().slice(0, 5) };
+  }
+
+  return { id: 'workout', label: 'トレーニング記録', icon: '🏋️', render, summary };
 })();
 
 /* =====================================================================
@@ -1433,7 +1771,7 @@ const BodyModule = (() => {
     if (!chartableFields.find(f => f.key === metricKey)) metricKey = chartableFields[0]?.key || 'weight';
 
     rootEl.innerHTML = `
-      <div class="panel coach">
+      <div class="panel">
         <div class="stats-head">
           <h2>📊 体組成</h2>
           <div class="toolbar" style="margin:0;">
@@ -1442,7 +1780,6 @@ const BodyModule = (() => {
             <button class="btn ghost sm" id="bExport">⬇️ CSV書き出し</button>
           </div>
         </div>
-        ${coachComment(recs)}
       </div>
 
       <div class="panel">
@@ -1580,7 +1917,10 @@ const BodyModule = (() => {
       interaction: { mode: 'index', intersect: false },
       plugins: { zoom: zoomOpts(pts.length - 1) },
       scales: {
-        x: { min: monthStartIndex(pts), ticks: { maxTicksLimit: 8, maxRotation: 0, autoSkip: true } },
+        x: {
+          min: monthStartIndex(pts),
+          ticks: edgeXTicks(pts.length),
+        },
         ...extraScales,
       },
     };
@@ -1757,13 +2097,27 @@ const BodyModule = (() => {
     reader.readAsText(file);
   }
 
-  return { id: 'body', label: '体組成記録', icon: '📊', render };
+  function latestSummary() {
+    const recs = sorted();
+    const last = recs[recs.length - 1];
+    if (!last) return { count: 0 };
+    return {
+      count: recs.length,
+      latestDate: last.date,
+      weight: last.weight,
+      bodyFat: last.bodyFat,
+      smm: last.smm,
+      coachHTML: coachComment(recs),
+    };
+  }
+
+  return { id: 'body', label: '体組成記録', icon: '📊', render, latestSummary };
 })();
 
 /* =====================================================================
  *  食事管理 Module（カロリー・PFC記録 / 目標 / 推移）
  * ===================================================================== */
-const MEAL_TYPES = ['朝食', '昼食', '夕食', '間食'];
+const MEAL_TYPES = ['朝食', '昼食', '夕食', '間食', '食事写真'];
 const MealModule = (() => {
   const state = Store.ns('meal', { days: {}, targets: { kcal: 2000, p: 120, f: 60, c: 250 } });
   let selectedKey = dateKey(new Date());
@@ -1803,6 +2157,7 @@ const MealModule = (() => {
         <p class="hint" style="margin-top:6px;">PFCバランス（カロリー比）</p>
         <div class="toolbar">
           <button class="btn sm" id="mAdd">＋ 食事を追加</button>
+          <button class="btn ghost sm" id="mPhoto">📷 写真で推定</button>
           <button class="btn ghost sm" id="mTarget">🎯 目標を設定</button>
         </div>
       </div>
@@ -1816,6 +2171,7 @@ const MealModule = (() => {
     rootEl.querySelector('#mNext').onclick = () => { shiftDay(1); };
     rootEl.querySelector('#mToday').onclick = () => { selectedKey = dateKey(new Date()); redraw(); };
     rootEl.querySelector('#mAdd').onclick = () => openMealModal(null);
+    rootEl.querySelector('#mPhoto').onclick = openPhotoEstimateModal;
     rootEl.querySelector('#mTarget').onclick = openTargetModal;
 
     renderMeals();
@@ -1937,6 +2293,59 @@ const MealModule = (() => {
     calc();
   }
 
+  function mockMealEstimate(fileName = '') {
+    const lower = fileName.toLowerCase();
+    if (/salad|サラダ|野菜/.test(lower)) return { name: 'サラダ中心の食事', kcal: 320, p: 18, f: 14, c: 32 };
+    if (/ramen|ラーメン|noodle/.test(lower)) return { name: '麺類', kcal: 780, p: 28, f: 26, c: 102 };
+    if (/rice|don|丼|カレー|curry/.test(lower)) return { name: 'ごはんもの', kcal: 720, p: 30, f: 22, c: 98 };
+    if (/chicken|鶏|protein|肉/.test(lower)) return { name: '高タンパク食', kcal: 560, p: 45, f: 18, c: 48 };
+    return { name: '写真から推定した食事', kcal: 620, p: 30, f: 20, c: 80 };
+  }
+
+  function openPhotoEstimateModal() {
+    Modal.open({
+      title: '📷 食事写真から推定',
+      saveLabel: '食事記録に追加',
+      bodyHTML: `
+        <div class="field">
+          <label class="field-label">写真</label>
+          <input type="file" id="photoInput" accept="image/*" capture="environment">
+          <img id="photoPreview" class="photo-preview" style="display:none;">
+        </div>
+        <div id="estimateArea" class="estimate-box">
+          <b>推定結果</b><br>
+          <span class="hint">現在はモック推定です。AI API接続後に写真内容から自動解析します。</span>
+        </div>`,
+      onSave: (b) => {
+        const est = b._estimate || mockMealEstimate();
+        if (!state.days[selectedKey]) state.days[selectedKey] = [];
+        state.days[selectedKey].push({ id: uid(), type: '食事写真', ...est });
+        Store.save();
+        redraw();
+        toast('推定結果を食事記録に追加しました');
+      },
+    });
+    const body = Modal.body;
+    body.querySelector('#photoInput').onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const est = mockMealEstimate(file.name);
+      body._estimate = est;
+      const img = body.querySelector('#photoPreview');
+      img.src = URL.createObjectURL(file);
+      img.style.display = '';
+      body.querySelector('#estimateArea').innerHTML = `
+        <b>${escapeHTML(est.name)}</b>
+        <div class="ex-sets" style="margin-top:8px;">
+          <span class="set-chip"><b>${est.kcal}</b> kcal</span>
+          <span class="set-chip">P <b>${est.p}</b>g</span>
+          <span class="set-chip">F <b>${est.f}</b>g</span>
+          <span class="set-chip">C <b>${est.c}</b>g</span>
+        </div>
+        <p class="hint" style="margin-top:8px;">AI接続前の仮推定です。保存後に編集できます。</p>`;
+    };
+  }
+
   function openTargetModal() {
     const tg = state.targets;
     Modal.open({
@@ -1960,7 +2369,128 @@ const MealModule = (() => {
     });
   }
 
-  return { id: 'meal', label: '食事管理', icon: '🍽️', render };
+  function summary() {
+    const today = dateKey(new Date());
+    const t = totals(today);
+    return { today, totals: t, targets: state.targets, daysLogged: Object.keys(state.days).length };
+  }
+
+  return { id: 'meal', label: '食事管理', icon: '🍽️', render, summary };
+})();
+
+/* =====================================================================
+ *  AI Trainer Module（モック）
+ *  後でOpenAI等のAPIへ差し替える前提で、チャット履歴と文脈生成を分離
+ * ===================================================================== */
+const TrainerModule = (() => {
+  const state = Store.ns('trainer', { messages: [] });
+  let rootEl = null;
+
+  function context() {
+    return {
+      user: UserSettings.state,
+      workout: WorkoutModule.summary(),
+      body: BodyModule.latestSummary(),
+      meal: MealModule.summary(),
+    };
+  }
+
+  function render(el) {
+    rootEl = el;
+    if (!state.messages.length) {
+      state.messages.push({
+        role: 'trainer',
+        text: 'こんにちは、TralogのAIトレーナーです。目標、食事、トレーニング、体組成の変化をまとめて見ながら提案します。まずは「今週のメニューを作って」など気軽に聞いてください。',
+      });
+      Store.save();
+    }
+    redraw();
+  }
+
+  function redraw() {
+    const ctx = context();
+    const bodyCoach = ctx.body.coachHTML || `<div class="coach-box"><span class="coach-ava">🧑‍🏫</span><div><b>コーチからのひとこと</b><br><span class="hint">体組成を記録すると、ここに変化の分析が表示されます。</span></div></div>`;
+    rootEl.innerHTML = `
+      <div class="panel">
+        <div class="stats-head">
+          <h2>🤖 AIトレーナー</h2>
+          <button class="btn ghost sm" id="clearChat">履歴クリア</button>
+        </div>
+        ${bodyCoach}
+        <div class="stat-cards">
+          <div class="stat-card"><div class="lbl">目標</div><div class="val" style="font-size:16px;">${escapeHTML(ctx.user.profile.goal || '未設定')}</div></div>
+          <div class="stat-card"><div class="lbl">最新体重</div><div class="val">${ctx.body.weight ?? '-'}<small> kg</small></div></div>
+          <div class="stat-card"><div class="lbl">今日の摂取</div><div class="val">${Math.round(ctx.meal.totals.kcal)}<small> kcal</small></div></div>
+          <div class="stat-card"><div class="lbl">総ボリューム</div><div class="val">${ctx.workout.volume ?? 0}<small> kg</small></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="quick-prompts">
+          ${['今週のトレーニングメニューを作って', '今日の食事を改善したい', '目標に対して何を変えるべき？', '次の胸トレを提案して', '体組成の変化を解説して'].map(q => `<button class="btn ghost sm" data-prompt="${escapeHTML(q)}">${q}</button>`).join('')}
+        </div>
+        <div class="chat-box" id="chatBox" style="margin-top:16px;">${state.messages.map(renderMsg).join('')}</div>
+        <div class="chat-input-row">
+          <textarea id="chatInput" rows="2" placeholder="AIトレーナーに相談する"></textarea>
+          <button class="btn" id="sendChat">送信</button>
+        </div>
+        <p class="hint" style="margin-top:8px;">現在はモックAIです。API接続後は写真・記録・目標を使った本格的な提案に切り替えます。</p>
+      </div>`;
+
+    rootEl.querySelector('#clearChat').onclick = () => {
+      if (!confirm('チャット履歴を削除しますか？')) return;
+      state.messages = [];
+      Store.save();
+      render(rootEl);
+    };
+    rootEl.querySelectorAll('[data-prompt]').forEach(b => b.onclick = () => send(b.dataset.prompt));
+    rootEl.querySelector('#sendChat').onclick = () => {
+      const input = rootEl.querySelector('#chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      send(text);
+    };
+  }
+
+  function renderMsg(m) {
+    return `<div class="chat-msg ${m.role === 'user' ? 'user' : ''}">
+      <div class="role">${m.role === 'user' ? 'YOU' : 'TRAINER'}</div>
+      <div class="text">${escapeHTML(m.text)}</div>
+    </div>`;
+  }
+
+  function send(text) {
+    state.messages.push({ role: 'user', text });
+    state.messages.push({ role: 'trainer', text: reply(text, context()) });
+    Store.save();
+    redraw();
+    const box = rootEl.querySelector('#chatBox');
+    if (box) box.scrollIntoView({ block: 'end' });
+  }
+
+  function reply(text, ctx) {
+    const q = text.toLowerCase();
+    const goal = ctx.user.profile.goal || '目標未設定';
+    const height = ctx.user.profile.heightCm ? `身長${ctx.user.profile.heightCm}cm` : '身長未設定';
+    const kcalGap = Math.round((ctx.meal.targets.kcal || 0) - (ctx.meal.totals.kcal || 0));
+
+    if (/食|カロリー|pfc|meal|kcal/.test(q)) {
+      return `今日の摂取は約${Math.round(ctx.meal.totals.kcal)}kcalです。目標との差は${kcalGap >= 0 ? '残り' : '超過'}${Math.abs(kcalGap)}kcal。\n\n${goal.includes('脂肪') ? '減量寄りなら、タンパク質を優先して脂質を少し抑えましょう。' : '筋肉を増やすなら、トレーニング後に炭水化物とタンパク質をセットで入れるのがおすすめです。'}\n写真推定は今は仮実装なので、保存後に数値を微調整してください。`;
+    }
+    if (/メニュー|トレ|胸|腕|肩|背中|脚|お尻|腹筋|workout/.test(q)) {
+      const top = ctx.workout.menus?.[0]?.menuName || 'スクワット';
+      return `${goal}に合わせた提案です。\n\n1. メイン種目: ${top} 3〜4セット\n2. 補助種目: 苦手部位を2種目、各10〜12回\n3. 仕上げ: 体幹 or 有酸素 10〜15分\n\n直近の記録が増えるほど、前回重量や疲労を踏まえた提案にできます。`;
+    }
+    if (/体組成|体重|体脂肪|筋肉|inbody/.test(q)) {
+      return `現在の体組成メモです。\n\n最新: 体重 ${ctx.body.weight ?? '-'}kg / 体脂肪率 ${ctx.body.bodyFat ?? '-'}% / 骨格筋量 ${ctx.body.smm ?? '-'}kg\n${height}\n\nAIトレーナータブ上部の「コーチからのひとこと」も確認してください。変化が少ない時は、トレーニング強度・摂取カロリー・睡眠のどれかを1つだけ調整するのがおすすめです。`;
+    }
+    if (/目標|goal|どう/.test(q)) {
+      return `今の目標は「${goal}」ですね。\n\nまず見るべき指標は3つです。\n1. 週のトレーニング頻度\n2. 体重・体脂肪率・骨格筋量の方向\n3. 摂取カロリーとタンパク質量\n\n次に「いつまでに」「どれくらい」を入れると、週単位の行動目標まで落とし込めます。`;
+    }
+    return `相談ありがとうございます。\n\n今の設定は「${goal}」、${height}です。トレーニング・食事・体組成のどれを優先して変えたいか教えてください。具体的には「今週3回行ける」「体脂肪を落としたい」「夕食が重くなりがち」などでOKです。`;
+  }
+
+  return { id: 'trainer', label: 'AIトレーナー', icon: '🤖', render };
 })();
 
 /* ---------------- 共通ヘルパ ---------------- */
@@ -1973,7 +2503,9 @@ function numOrNull(v) { if (v === '' || v == null) return null; const n = Number
 App.registerModule(WorkoutModule);
 App.registerModule(BodyModule);
 App.registerModule(MealModule);
+App.registerModule(TrainerModule);
 App.start();
+UserSettings.init();
 </script>
 </body>
 </html>
