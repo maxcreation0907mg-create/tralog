@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tralog</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%F0%9F%8F%8B%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='black'/%3E%3Cpath d='M24 28h52M50 28v46' stroke='white' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
@@ -60,15 +60,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  .container { max-width: 1080px; margin: 0 auto; padding: 0 20px 20px; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 20px 96px; }
 
-  /* ===== 固定ヘッダー（ブランド + タブ） ===== */
+  /* ===== ヘッダー / 固定フッター ===== */
   .app-top {
-    position: sticky;
-    top: 0;
-    z-index: 30;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: space-between;
     gap: 14px;
     background: var(--surface);
@@ -86,10 +83,30 @@
     background-clip: text;
     color: transparent;
   }
+  .app-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(14px);
+  }
+  .footer-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 6px 20px calc(6px + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+  }
 
   /* タブナビ（モジュールごとに自動生成・アイコン表示） */
   .tabbar {
     display: flex;
+    justify-content: space-around;
     gap: 2px;
     overflow-x: auto;
   }
@@ -111,23 +128,24 @@
     margin-bottom: -1px;
   }
   .tabbar button .tab-ico { font-size: 20px; line-height: 1.2; }
+  .tabbar svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .tabbar button .tab-lbl { font-size: 11px; font-weight: 700; }
   .tabbar button:hover { color: var(--text); }
   .tabbar button.active { color: var(--primary); border-bottom-color: var(--primary); }
   .tabbar button .soon { font-size: 10px; opacity: 0.8; font-weight: 600; }
   .account-btn {
     align-self: center;
-    border: 1px solid var(--border);
+    border: none;
     background: transparent;
     color: var(--text);
     cursor: pointer;
-    border-radius: 999px;
-    font-size: 14px;
+    border-radius: 12px;
+    font-size: 22px;
     font-weight: 800;
-    padding: 7px 11px;
+    padding: 8px 10px;
     white-space: nowrap;
   }
-  .account-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .account-btn:hover { color: var(--primary); background: var(--surface-2); }
 
   .module-view { animation: fade 0.2s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -362,16 +380,54 @@
   .trend-chip.flat { color: var(--muted); }
 
   /* ===== AIトレーナー / 写真推定 ===== */
-  .chat-box { display: grid; gap: 12px; }
-  .chat-msg { max-width: 86%; border-left: 3px solid var(--border); padding: 8px 0 8px 12px; }
-  .chat-msg.user { justify-self: end; border-left: none; border-right: 3px solid var(--primary); padding: 8px 12px 8px 0; text-align: right; }
-  .chat-msg .role { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-  .chat-msg .text { margin-top: 2px; white-space: pre-wrap; }
+  .chat-box { display: grid; gap: 10px; background: var(--surface-2); border-radius: 18px; padding: 14px; }
+  .chat-msg { max-width: 82%; justify-self: start; }
+  .chat-msg.user { justify-self: end; text-align: left; }
+  .chat-msg .role { display: none; }
+  .chat-msg .text {
+    margin-top: 0;
+    white-space: pre-wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px 18px 18px 4px;
+    padding: 10px 13px;
+    font-size: 14px;
+  }
+  .chat-msg.user .text {
+    background: #d9fdd3;
+    color: #111;
+    border-color: #c7edc0;
+    border-radius: 18px 18px 4px 18px;
+  }
   .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .chat-input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 14px; }
   .sync-pill { display: inline-flex; gap: 6px; align-items: center; border-left: 1px solid var(--border); padding-left: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
   .photo-preview { max-width: 100%; border-radius: 12px; margin: 8px 0; border: 1px solid var(--border); }
   .estimate-box { border-left: 3px solid var(--warning); padding: 6px 0 6px 12px; margin-top: 10px; }
+  .settings-section { border-left: 1px solid var(--border); padding-left: 14px; margin-bottom: 18px; }
+  .settings-section-title { font-size: 13px; font-weight: 900; margin-bottom: 10px; }
+  .fab {
+    position: fixed;
+    right: 22px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    z-index: 45;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(24, 95, 165, 0.28);
+  }
+  .featured-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 0; margin: 14px 0 18px; }
+  .featured-card { border-left: 1px solid var(--border); padding-left: 18px; }
+  .featured-card .lbl { font-size: 12px; color: var(--muted); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+  .featured-card .val { font-size: clamp(28px, 7vw, 44px); font-weight: 900; letter-spacing: -0.04em; line-height: 1.05; }
+  .featured-card small { font-size: 14px; color: var(--muted); font-weight: 700; }
+  .chart-axis-row { display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:12px; font-weight:800; margin-top:4px; }
 
   .range-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .range-toggle button { border: none; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 700; padding: 7px 12px; cursor: pointer; }
@@ -440,14 +496,19 @@
 <div class="container">
   <div class="app-top">
     <div class="brand">Tralog</div>
-    <nav class="tabbar" id="tabbar"></nav>
-    <button class="account-btn" id="accountBtn">👤</button>
   </div>
 
   <main id="view"></main>
 
   <p class="footer-note">データはこのブラウザ内（localStorage）に保存されます。</p>
 </div>
+
+<footer class="app-footer">
+  <div class="footer-inner">
+    <nav class="tabbar" id="tabbar"></nav>
+    <button class="account-btn" id="accountBtn" aria-label="設定">⚙</button>
+  </div>
+</footer>
 
 <!-- 記録追加・編集モーダル -->
 <div class="modal-overlay" id="modal">
@@ -707,7 +768,7 @@ const UserSettings = (() => {
   function renderButton() {
     const btn = document.getElementById('accountBtn');
     if (!btn) return;
-    btn.textContent = state.account.email ? '👤 同期' : '👤 設定';
+    btn.textContent = '⚙';
     btn.title = state.account.email ? `同期ID: ${state.account.syncId}` : '初期設定・アカウント紐付け';
   }
 
@@ -723,29 +784,35 @@ const UserSettings = (() => {
       title: isInitial ? '初期設定' : 'アカウント・プロフィール',
       saveLabel: '保存',
       bodyHTML: `
-        <div class="field">
-          <label class="field-label">アカウント紐付け（モック）</label>
-          <input id="uEmail" type="email" placeholder="メールアドレス" value="${escapeHTML(state.account.email || '')}">
-          <p class="hint">今は端末内保存です。後でクラウド同期を接続する時、このメールアドレス/同期IDに紐付けます。</p>
+        <div class="settings-section" data-section="account">
+          <div class="settings-section-title">アカウント</div>
+          <div class="field">
+            <label class="field-label">アカウント紐付け（モック）</label>
+            <input id="uEmail" type="email" placeholder="メールアドレス" value="${escapeHTML(state.account.email || '')}">
+            <p class="hint">今は端末内保存です。後でクラウド同期を接続する時、このメールアドレス/同期IDに紐付けます。</p>
+          </div>
         </div>
-        <div class="pfc-grid" style="grid-template-columns:1fr 1fr;">
-          <div class="field"><label class="hint">表示名</label><input id="uName" value="${escapeHTML(state.account.displayName || '')}" placeholder="例: Daisuke"></div>
-          <div class="field"><label class="hint">身長(cm)</label><input id="uHeight" type="number" step="0.1" value="${state.profile.heightCm || ''}" placeholder="170"></div>
-          <div class="field"><label class="hint">年齢</label><input id="uAge" type="number" value="${state.profile.age || ''}" placeholder="30"></div>
-          <div class="field"><label class="hint">性別</label>
-            <select id="uSex">
-              ${['', '男性', '女性', 'その他'].map(v => `<option value="${v}" ${state.profile.sex === v ? 'selected' : ''}>${v || '未設定'}</option>`).join('')}
-            </select>
-          </div>
-          <div class="field"><label class="hint">目標</label>
-            <select id="uGoal">
-              ${['筋肉を増やす', '体脂肪を落とす', '体力をつける', '健康維持', '大会・イベントに向ける'].map(v => `<option ${state.profile.goal === v ? 'selected' : ''}>${v}</option>`).join('')}
-            </select>
-          </div>
-          <div class="field"><label class="hint">運動頻度</label>
-            <select id="uActivity">
-              ${['週1回以下', '週2-3回', '週4-5回', '週6回以上'].map(v => `<option ${state.profile.activity === v ? 'selected' : ''}>${v}</option>`).join('')}
-            </select>
+        <div class="settings-section" data-section="profile">
+          <div class="settings-section-title">プロフィール</div>
+          <div class="pfc-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="field"><label class="hint">表示名</label><input id="uName" value="${escapeHTML(state.account.displayName || '')}" placeholder="例: Daisuke"></div>
+            <div class="field"><label class="hint">身長(cm)</label><input id="uHeight" type="number" step="0.1" value="${state.profile.heightCm || ''}" placeholder="170"></div>
+            <div class="field"><label class="hint">年齢</label><input id="uAge" type="number" value="${state.profile.age || ''}" placeholder="30"></div>
+            <div class="field"><label class="hint">性別</label>
+              <select id="uSex">
+                ${['', '男性', '女性', 'その他'].map(v => `<option value="${v}" ${state.profile.sex === v ? 'selected' : ''}>${v || '未設定'}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label class="hint">目標</label>
+              <select id="uGoal">
+                ${['筋肉を増やす', '体脂肪を落とす', '体力をつける', '健康維持', '大会・イベントに向ける'].map(v => `<option ${state.profile.goal === v ? 'selected' : ''}>${v}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label class="hint">運動頻度</label>
+              <select id="uActivity">
+                ${['週1回以下', '週2-3回', '週4-5回', '週6回以上'].map(v => `<option ${state.profile.activity === v ? 'selected' : ''}>${v}</option>`).join('')}
+              </select>
+            </div>
           </div>
         </div>
         <div class="estimate-box">
@@ -884,6 +951,13 @@ function builtinMenus(catId) {
   });
 }
 
+const FLAT_ICONS = {
+  workout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8"/></svg>',
+  body: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M7 8c0-2.2 2.2-4 5-4s5 1.8 5 4c0 3-2.5 4-5 4s-5 1-5 4c0 2.2 2.2 4 5 4s5-1.8 5-4"/></svg>',
+  meal: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4 3v6c0 2 1.5 3 3 3s3-1 3-3V3M17 3c2 2 3 4.2 3 7 0 3-1.2 5-3 5v6"/></svg>',
+  trainer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14v9H8l-3 3V8zM9 12h.01M15 12h.01M12 3v5"/></svg>',
+};
+
 /* =====================================================================
  *  Workout Module
  * ===================================================================== */
@@ -961,14 +1035,14 @@ const WorkoutModule = (() => {
   function render(el) {
     rootEl = el;
     el.innerHTML = `
-      <div class="panel" id="heroPanel"></div>
       <div class="panel" id="calPanel"></div>
       <div class="panel" id="routinePanel"></div>
+      <div class="panel" id="heroPanel"></div>
       <div class="panel" id="statsPanel"></div>
     `;
-    renderHero();
     renderCalendar();
     renderRoutines();
+    renderHero();
     renderStats();
   }
 
@@ -1003,17 +1077,17 @@ const WorkoutModule = (() => {
 
     let msg;
     if (!allKeys.length) msg = 'ようこそ、Tralogへ。最初の記録が最高のスタートです。';
-    else if (lastGap === 0) msg = '今日のトレーニング完了！この積み重ねが確実に体を変えます 🔥';
+    else if (lastGap === 0) msg = '今日のトレーニング完了。この積み重ねが確実に体を変えます。';
     else if (lastGap === 1) msg = '昨日もナイストレーニング。今日も体を動かしますか？';
     else if (lastGap >= 4) msg = `前回から${lastGap}日。筋肉が出番を待っています。軽めでもOK、まず一歩！`;
-    else msg = 'いいペースです。今日も1セットずつ積み上げましょう 💪';
+    else msg = 'いいペースです。今日も1セットずつ積み上げましょう。';
 
     const volDisp = monthVolume >= 1000 ? { v: round(monthVolume / 1000, 1), u: 't' } : { v: monthVolume, u: 'kg' };
     panel.innerHTML = `
       <div class="hero-greet">${today.getMonth() + 1}月${today.getDate()}日（${WEEK_JP[today.getDay()]}）</div>
       <div class="hero-msg">${msg}</div>
       <div class="hero-stats">
-        <div class="hero-stat"><div class="hs-lbl">週ストリーク</div><div class="hs-val">${streak}<small> 週</small>${streak >= 2 ? ' 🔥' : ''}</div></div>
+        <div class="hero-stat"><div class="hs-lbl">週ストリーク</div><div class="hs-val">${streak}<small> 週</small></div></div>
         <div class="hero-stat"><div class="hs-lbl">今月のトレ日数</div><div class="hs-val">${monthDays.length}<small> 日</small></div></div>
         <div class="hero-stat"><div class="hs-lbl">今月の総ボリューム</div><div class="hs-val">${volDisp.v}<small> ${volDisp.u}</small></div></div>
         <div class="hero-stat"><div class="hs-lbl">今月のセット数</div><div class="hs-val">${monthSets}<small> set</small></div></div>
@@ -1069,7 +1143,7 @@ const WorkoutModule = (() => {
       <div class="cal-grid">${cells}</div>
       <div class="legend">${legend}</div>
       <div class="toolbar">
-        <button class="btn ghost sm" id="exportBtn">⬇️ CSV書き出し</button>
+        <button class="btn ghost sm" id="exportBtn">データエクスポート</button>
       </div>
     `;
 
@@ -1136,7 +1210,7 @@ const WorkoutModule = (() => {
     const recs = recordsOf(selectedKey);
     let html;
     if (!recs.length) {
-      html = `<div class="empty-state"><div class="big">📝</div>この日の記録はまだありません。</div>`;
+      html = `<div class="empty-state"><div class="big">□</div>この日の記録はまだありません。</div>`;
     } else {
       const groups = {};
       recs.forEach(r => { (groups[r.category] ||= []).push(r); });
@@ -1205,11 +1279,9 @@ const WorkoutModule = (() => {
     panel.innerHTML = `
       <div class="stats-head">
         <h2 style="font-size:16px;">ルーティンメニュー</h2>
-        <button class="btn ghost sm" id="addRoutineBtn">＋ ルーティン作成</button>
       </div>
       ${state.routines.length ? `<div class="routine-list">${rows}</div>` : `<p class="hint">よく行う組み合わせを登録すると、今日の記録へまとめて追加できます。</p>`}`;
 
-    panel.querySelector('#addRoutineBtn').onclick = () => openRoutineModal(null);
     panel.querySelectorAll('[data-use-routine]').forEach(b => b.onclick = () => applyRoutine(b.dataset.useRoutine));
     panel.querySelectorAll('[data-edit-routine]').forEach(b => b.onclick = () => openRoutineModal(b.dataset.editRoutine));
     panel.querySelectorAll('[data-del-routine]').forEach(b => b.onclick = () => {
@@ -1479,6 +1551,9 @@ const WorkoutModule = (() => {
       saveLabel: editing ? '更新' : '追加',
       bodyHTML: `
         <div class="field">
+          <button type="button" class="btn ghost sm" id="routineFromRecord">＋ ルーティン作成</button>
+        </div>
+        <div class="field">
           <label class="field-label">カテゴリー</label>
           <div class="cat-chips" id="catChips"></div>
         </div>
@@ -1524,6 +1599,7 @@ const WorkoutModule = (() => {
     const catChips = body.querySelector('#catChips');
     const menuList = body.querySelector('#menuList');
     const detailArea = body.querySelector('#detailArea');
+    body.querySelector('#routineFromRecord').onclick = () => openRoutineModal(null);
 
     // カテゴリーチップ
     catChips.innerHTML = CATEGORIES.map(c =>
@@ -1546,7 +1622,7 @@ const WorkoutModule = (() => {
         return `<div class="menu-item custom ${active}" data-mid="${mn.id}">
           <span class="mi-name">${escapeHTML(mn.name)}</span>
           <span class="mi-actions">
-            <button type="button" class="mi-ico" data-edit-menu="${mn.id}" title="編集">✏️</button>
+            <button type="button" class="mi-ico" data-edit-menu="${mn.id}" title="編集">Edit</button>
             <button type="button" class="mi-ico" data-del-menu="${mn.id}" title="削除">✕</button>
           </span>
         </div>`;
@@ -1703,7 +1779,7 @@ const WorkoutModule = (() => {
     return { latest, totalRecords, volume: round(volume, 0), menus: loggedMenus().slice(0, 5) };
   }
 
-  return { id: 'workout', label: 'トレーニング記録', icon: '🏋️', render, summary };
+  return { id: 'workout', label: 'トレーニング記録', icon: FLAT_ICONS.workout, render, summary };
 })();
 
 /* =====================================================================
@@ -1727,6 +1803,7 @@ function normHeader(h) { return String(h || '').replace(/^\uFEFF/, '').replace(/
 
 const BodyModule = (() => {
   const state = Store.ns('body', { records: [] });
+  if (!state.featured) state.featured = ['weight', 'bodyFat', 'smm'];
   let rootEl = null;
   const PREVIEW = 5;            // 一覧の初期表示件数
   let expanded = false;         // 一覧を全件表示するか
@@ -1744,22 +1821,23 @@ const BodyModule = (() => {
     if (!recs.length) {
       rootEl.innerHTML = `
         <div class="panel">
-          <div class="stats-head"><h2>📊 体組成</h2>
-            <div class="toolbar" style="margin:0;">
-              <button class="btn sm" id="bAdd">＋ 記録を追加</button>
-              <label class="file-btn">📥 InBody CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label>
-            </div>
+          <div class="stats-head"><h2>体組成</h2>
           </div>
-          <div class="empty-state"><div class="big">📊</div>記録がありません。手動入力か、InBodyのCSVを取り込んでください。</div>
-        </div>`;
-      rootEl.querySelector('#bAdd').onclick = () => openRecordModal(null);
+          <div class="empty-state"><div class="big">□</div>記録がありません。手動入力か、InBodyのCSVを取り込んでください。</div>
+        </div>
+        <div class="panel"><div class="toolbar"><label class="file-btn">CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label></div></div>
+        <button class="fab" id="bAdd" aria-label="記録追加">＋</button>`;
       rootEl.querySelector('#bCsv').onchange = handleCSV;
+      rootEl.querySelector('#bAdd').onclick = () => openRecordModal(null);
       return;
     }
 
     const last = recs[recs.length - 1], prev = recs[recs.length - 2];
     // 直近の記録にある全InBody項目をカード表示
     const presentFields = BODY_FIELDS.filter(f => last[f.key] != null);
+    const featuredFields = state.featured.map(bodyField).filter(f => f && last[f.key] != null).slice(0, 3);
+    const otherFields = presentFields.filter(f => !featuredFields.some(ff => ff.key === f.key));
+    const featured = `<div class="featured-cards">` + featuredFields.map(f => featuredCard(f, last[f.key], prev?.[f.key])).join('') + `</div>`;
     const cards = `<div class="stat-cards">` + presentFields.map(f => {
       const v = last[f.key], pv = prev?.[f.key];
       const d = (v != null && pv != null) ? round(v - pv, 1) : null;
@@ -1773,11 +1851,11 @@ const BodyModule = (() => {
     rootEl.innerHTML = `
       <div class="panel">
         <div class="stats-head">
-          <h2>📊 体組成</h2>
+          <h2>体組成</h2>
           <div class="toolbar" style="margin:0;">
             <button class="btn sm" id="bAdd">＋ 記録を追加</button>
-            <label class="file-btn">📥 CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label>
-            <button class="btn ghost sm" id="bExport">⬇️ CSV書き出し</button>
+            <label class="file-btn">CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label>
+            <button class="btn ghost sm" id="bExport">CSV書き出し</button>
           </div>
         </div>
       </div>
@@ -1785,8 +1863,10 @@ const BodyModule = (() => {
       <div class="panel">
         <div class="stats-head" style="margin-bottom:6px;">
           <h2 style="font-size:16px;">最新の状態（前回測定比）</h2>
+          <button class="btn ghost sm" id="bFeatured">大きく表示する3項目</button>
           <span class="hint">${last.date}${last.time ? ' ' + last.time : ''} 時点</span>
         </div>
+        ${featured}
         ${cards}
       </div>
 
@@ -1803,6 +1883,7 @@ const BodyModule = (() => {
           <h2 style="font-size:16px;">体脂肪率 と 骨格筋量</h2>
           <button class="btn ghost sm" id="bCompReset">全体</button>
         </div>
+        <div class="chart-axis-row"><span>%</span><span>kg</span></div>
         <div class="chart-wrap"><canvas id="bCompChart"></canvas></div>
       </div>
 
@@ -1825,11 +1906,19 @@ const BodyModule = (() => {
           <div id="bBulkBar"></div>
         </div>
         <div id="bTable"></div>
-      </div>`;
+      </div>
+      <div class="panel">
+        <div class="toolbar">
+          <label class="file-btn">CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label>
+          <button class="btn ghost sm" id="bExport">CSV書き出し</button>
+        </div>
+      </div>
+      <button class="fab" id="bAdd" aria-label="記録追加">＋</button>`;
 
     rootEl.querySelector('#bAdd').onclick = () => openRecordModal(null);
     rootEl.querySelector('#bCsv').onchange = handleCSV;
     rootEl.querySelector('#bExport').onclick = exportCSV;
+    rootEl.querySelector('#bFeatured').onclick = openFeaturedModal;
     rootEl.querySelector('#bZoomReset').onclick = () => Charts.resetZoom('bWeightChart');
     rootEl.querySelector('#bCompReset').onclick = () => Charts.resetZoom('bCompChart');
     rootEl.querySelector('#bMetricReset').onclick = () => Charts.resetZoom('bMetricChart');
@@ -1843,7 +1932,7 @@ const BodyModule = (() => {
   /* --- コーチコメント（トレンド分析） --- */
   function coachComment(recs) {
     if (recs.length < 2) {
-      return `<div class="coach-box"><span class="coach-ava">🧑‍🏫</span>
+      return `<div class="coach-box"><span class="coach-ava">□</span>
         <div><b>記録ありがとうございます！</b><br><span class="hint">あと数回記録すると、体重・体脂肪・筋肉の変化を分析してアドバイスします。まずは継続が一番の近道です。</span></div></div>`;
     }
     const lastW = lastValued(recs, 'weight'), firstW = firstValued(recs, 'weight');
@@ -1863,7 +1952,7 @@ const BodyModule = (() => {
     const fatDown = dF != null && dF < 0, fatUp = dF != null && dF > 0;
     const musUp = dM != null && dM > 0, musDown = dM != null && dM < 0;
     if (fatDown && (musUp || (dM != null && dM >= -0.2))) {
-      msg = '理想的な変化です！脂肪が落ちつつ筋肉を維持・増量できています。今のトレーニングと食事の方向性を継続しましょう。💪';
+      msg = '理想的な変化です！脂肪が落ちつつ筋肉を維持・増量できています。今のトレーニングと食事の方向性を継続しましょう。';
     } else if (musUp && (dW != null && dW > 0) && !fatUp) {
       msg = '増量フェーズとして良い流れです。筋肉がしっかり増えています。体脂肪率が上がりすぎないよう、引き続き食事の質に気を配りましょう。';
     } else if (fatUp && musDown) {
@@ -1875,7 +1964,7 @@ const BodyModule = (() => {
     }
 
     return `<div class="coach-box">
-      <span class="coach-ava">🧑‍🏫</span>
+      <span class="coach-ava">□</span>
       <div style="flex:1;">
         <b>コーチからのひとこと</b>
         <div class="hint" style="margin:2px 0 8px;">分析期間: ${span}</div>
@@ -1902,6 +1991,42 @@ const BodyModule = (() => {
       deltaHTML = `<div class="delta ${cls}">${sign}${delta}${f.unit}（前回比）</div>`;
     }
     return `<div class="stat-card"><div class="lbl">${f.label}</div><div class="val">${v ?? '-'}<small> ${f.unit}</small></div>${deltaHTML}</div>`;
+  }
+
+  function featuredCard(f, v, prev) {
+    const delta = (v != null && prev != null) ? round(v - prev, 1) : null;
+    const sign = delta > 0 ? '+' : '';
+    return `<div class="featured-card">
+      <div class="lbl">${f.label}</div>
+      <div class="val">${v ?? '-'}<small> ${f.unit}</small></div>
+      ${delta != null ? `<div class="delta ${delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down'}">${sign}${delta}${f.unit}</div>` : ''}
+    </div>`;
+  }
+
+  function openFeaturedModal() {
+    Modal.open({
+      title: '大きく表示する3項目',
+      saveLabel: '保存',
+      bodyHTML: `
+        <p class="hint" style="margin-bottom:10px;">最新の状態で大きく見たい項目を3つ選択してください。</p>
+        <div class="routine-editor">
+          ${BODY_FIELDS.map(f => `<label class="custom-menu-row" style="justify-content:flex-start;">
+            <input type="checkbox" class="feat-check" value="${f.key}" ${state.featured.includes(f.key) ? 'checked' : ''} style="width:auto;">
+            <span>${f.label}${f.unit ? '（' + f.unit + '）' : ''}</span>
+          </label>`).join('')}
+        </div>`,
+      onSave: (body) => {
+        const checked = [...body.querySelectorAll('.feat-check:checked')].map(x => x.value).slice(0, 3);
+        if (checked.length !== 3) { toast('3項目を選択してください'); return false; }
+        state.featured = checked;
+        Store.save();
+        redraw();
+      },
+    });
+    Modal.body.querySelectorAll('.feat-check').forEach(ch => ch.onchange = () => {
+      const checked = [...Modal.body.querySelectorAll('.feat-check:checked')];
+      if (checked.length > 3) { ch.checked = false; toast('選択できるのは3項目までです'); }
+    });
   }
 
   // 直近1ヶ月の開始インデックス（初期表示ウィンドウ用）
@@ -1941,8 +2066,8 @@ const BodyModule = (() => {
         { label: '骨格筋量(kg)', data: recs.map(r => r.smm ?? null), borderColor: cssVar('--success'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y1', spanGaps: true, borderWidth: 2 },
       ] },
       options: lineOpts(recs, {
-        y: { position: 'left', title: { display: true, text: '%', color: cssVar('--muted') } },
-        y1: { position: 'right', title: { display: true, text: 'kg', color: cssVar('--muted') }, grid: { drawOnChartArea: false } },
+        y: { position: 'left' },
+        y1: { position: 'right', grid: { drawOnChartArea: false } },
       }),
     });
   }
@@ -2111,7 +2236,7 @@ const BodyModule = (() => {
     };
   }
 
-  return { id: 'body', label: '体組成記録', icon: '📊', render, latestSummary };
+  return { id: 'body', label: '体組成記録', icon: FLAT_ICONS.body, render, latestSummary };
 })();
 
 /* =====================================================================
@@ -2139,7 +2264,7 @@ const MealModule = (() => {
     rootEl.innerHTML = `
       <div class="panel">
         <div class="stats-head">
-          <h2>🍽️ 食事管理</h2>
+          <h2>食事管理</h2>
           <div style="display:flex; gap:8px; align-items:center;">
             <button class="icon-btn" id="mPrev">‹</button>
             <button class="btn ghost sm" id="mToday">今日</button>
@@ -2157,8 +2282,8 @@ const MealModule = (() => {
         <p class="hint" style="margin-top:6px;">PFCバランス（カロリー比）</p>
         <div class="toolbar">
           <button class="btn sm" id="mAdd">＋ 食事を追加</button>
-          <button class="btn ghost sm" id="mPhoto">📷 写真で推定</button>
-          <button class="btn ghost sm" id="mTarget">🎯 目標を設定</button>
+          <button class="btn ghost sm" id="mPhoto">写真で推定</button>
+          <button class="btn ghost sm" id="mTarget">目標を設定</button>
         </div>
       </div>
       <div class="panel"><div id="mMeals"></div></div>
@@ -2202,7 +2327,7 @@ const MealModule = (() => {
   function renderMeals() {
     const el = rootEl.querySelector('#mMeals');
     const list = dayList(selectedKey);
-    if (!list.length) { el.innerHTML = `<div class="empty-state"><div class="big">🍽️</div>この日の食事記録はまだありません。</div>`; return; }
+    if (!list.length) { el.innerHTML = `<div class="empty-state"><div class="big">□</div>この日の食事記録はまだありません。</div>`; return; }
     el.innerHTML = MEAL_TYPES.filter(tp => list.some(m => m.type === tp)).map(tp => {
       const items = list.filter(m => m.type === tp);
       const sub = items.reduce((a, m) => a + (m.kcal || 0), 0);
@@ -2304,7 +2429,7 @@ const MealModule = (() => {
 
   function openPhotoEstimateModal() {
     Modal.open({
-      title: '📷 食事写真から推定',
+      title: '食事写真から推定',
       saveLabel: '食事記録に追加',
       bodyHTML: `
         <div class="field">
@@ -2349,7 +2474,7 @@ const MealModule = (() => {
   function openTargetModal() {
     const tg = state.targets;
     Modal.open({
-      title: '🎯 1日の目標を設定',
+      title: '1日の目標を設定',
       saveLabel: '保存',
       bodyHTML: `<div class="pfc-grid">
         <div><label class="hint">カロリー(kcal)</label><input type="number" id="tKcal" value="${tg.kcal}"></div>
@@ -2375,7 +2500,7 @@ const MealModule = (() => {
     return { today, totals: t, targets: state.targets, daysLogged: Object.keys(state.days).length };
   }
 
-  return { id: 'meal', label: '食事管理', icon: '🍽️', render, summary };
+  return { id: 'meal', label: '食事管理', icon: FLAT_ICONS.meal, render, summary };
 })();
 
 /* =====================================================================
@@ -2409,11 +2534,11 @@ const TrainerModule = (() => {
 
   function redraw() {
     const ctx = context();
-    const bodyCoach = ctx.body.coachHTML || `<div class="coach-box"><span class="coach-ava">🧑‍🏫</span><div><b>コーチからのひとこと</b><br><span class="hint">体組成を記録すると、ここに変化の分析が表示されます。</span></div></div>`;
+    const bodyCoach = ctx.body.coachHTML || `<div class="coach-box"><span class="coach-ava">□</span><div><b>コーチからのひとこと</b><br><span class="hint">体組成を記録すると、ここに変化の分析が表示されます。</span></div></div>`;
     rootEl.innerHTML = `
       <div class="panel">
         <div class="stats-head">
-          <h2>🤖 AIトレーナー</h2>
+          <h2>AIトレーナー</h2>
           <button class="btn ghost sm" id="clearChat">履歴クリア</button>
         </div>
         ${bodyCoach}
@@ -2490,7 +2615,7 @@ const TrainerModule = (() => {
     return `相談ありがとうございます。\n\n今の設定は「${goal}」、${height}です。トレーニング・食事・体組成のどれを優先して変えたいか教えてください。具体的には「今週3回行ける」「体脂肪を落としたい」「夕食が重くなりがち」などでOKです。`;
   }
 
-  return { id: 'trainer', label: 'AIトレーナー', icon: '🤖', render };
+  return { id: 'trainer', label: 'AIトレーナー', icon: FLAT_ICONS.trainer, render };
 })();
 
 /* ---------------- 共通ヘルパ ---------------- */
