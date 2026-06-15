@@ -97,8 +97,7 @@
     max-width: 1080px;
     margin: 0 auto;
     padding: 6px 20px calc(6px + env(safe-area-inset-bottom));
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: block;
     align-items: center;
     gap: 8px;
   }
@@ -162,8 +161,6 @@
   .panel:last-child { border-bottom: none; }
 
   /* ===== モチベーションヒーロー ===== */
-  .hero-greet { font-size: 20px; font-weight: 800; }
-  .hero-msg { color: var(--muted); font-size: 14px; margin-top: 2px; }
   .hero-stats { display: flex; flex-wrap: wrap; gap: 14px 0; margin-top: 18px; }
   .hero-stat { padding: 0 22px; border-left: 1px solid var(--border); min-width: 120px; }
   .hs-lbl { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -380,7 +377,25 @@
   .trend-chip.flat { color: var(--muted); }
 
   /* ===== AIトレーナー / 写真推定 ===== */
-  .chat-box { display: grid; gap: 10px; background: var(--surface-2); border-radius: 18px; padding: 14px; }
+  .trainer-screen {
+    height: calc(100dvh - 150px);
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    border-radius: 22px;
+    overflow: hidden;
+  }
+  .trainer-top {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .trainer-name { font-weight: 900; font-size: 13px; letter-spacing: 0.02em; }
+  .chat-box { flex: 1 1 auto; overflow-y: auto; display: grid; align-content: start; gap: 10px; background: transparent; border-radius: 0; padding: 14px; }
   .chat-msg { max-width: 82%; justify-self: start; }
   .chat-msg.user { justify-self: end; text-align: left; }
   .chat-msg .role { display: none; }
@@ -400,7 +415,8 @@
     border-radius: 18px 18px 4px 18px;
   }
   .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .chat-input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 14px; }
+  .chat-input-row { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 0; padding: 10px; border-top: 1px solid var(--border); background: var(--surface); }
+  .chat-input-row textarea { border-radius: 999px; min-height: 42px; resize: none; }
   .sync-pill { display: inline-flex; gap: 6px; align-items: center; border-left: 1px solid var(--border); padding-left: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
   .photo-preview { max-width: 100%; border-radius: 12px; margin: 8px 0; border: 1px solid var(--border); }
   .estimate-box { border-left: 3px solid var(--warning); padding: 6px 0 6px 12px; margin-top: 10px; }
@@ -496,6 +512,7 @@
 <div class="container">
   <div class="app-top">
     <div class="brand">Tralog</div>
+    <button class="account-btn" id="accountBtn" aria-label="設定">⚙</button>
   </div>
 
   <main id="view"></main>
@@ -506,7 +523,6 @@
 <footer class="app-footer">
   <div class="footer-inner">
     <nav class="tabbar" id="tabbar"></nav>
-    <button class="account-btn" id="accountBtn" aria-label="設定">⚙</button>
   </div>
 </footer>
 
@@ -1035,14 +1051,12 @@ const WorkoutModule = (() => {
   function render(el) {
     rootEl = el;
     el.innerHTML = `
-      <div class="panel" id="calPanel"></div>
-      <div class="panel" id="routinePanel"></div>
       <div class="panel" id="heroPanel"></div>
+      <div class="panel" id="calPanel"></div>
       <div class="panel" id="statsPanel"></div>
     `;
-    renderCalendar();
-    renderRoutines();
     renderHero();
+    renderCalendar();
     renderStats();
   }
 
@@ -1075,17 +1089,8 @@ const WorkoutModule = (() => {
       lastGap = Math.max(0, Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(y, m - 1, d)) / 86400000));
     }
 
-    let msg;
-    if (!allKeys.length) msg = 'ようこそ、Tralogへ。最初の記録が最高のスタートです。';
-    else if (lastGap === 0) msg = '今日のトレーニング完了。この積み重ねが確実に体を変えます。';
-    else if (lastGap === 1) msg = '昨日もナイストレーニング。今日も体を動かしますか？';
-    else if (lastGap >= 4) msg = `前回から${lastGap}日。筋肉が出番を待っています。軽めでもOK、まず一歩！`;
-    else msg = 'いいペースです。今日も1セットずつ積み上げましょう。';
-
     const volDisp = monthVolume >= 1000 ? { v: round(monthVolume / 1000, 1), u: 't' } : { v: monthVolume, u: 'kg' };
     panel.innerHTML = `
-      <div class="hero-greet">${today.getMonth() + 1}月${today.getDate()}日（${WEEK_JP[today.getDay()]}）</div>
-      <div class="hero-msg">${msg}</div>
       <div class="hero-stats">
         <div class="hero-stat"><div class="hs-lbl">週ストリーク</div><div class="hs-val">${streak}<small> 週</small></div></div>
         <div class="hero-stat"><div class="hs-lbl">今月のトレ日数</div><div class="hs-val">${monthDays.length}<small> 日</small></div></div>
@@ -1263,6 +1268,7 @@ const WorkoutModule = (() => {
   /* ============ 描画: ルーティンメニュー ============ */
   function renderRoutines() {
     const panel = rootEl.querySelector('#routinePanel');
+    if (!panel) return;
     const rows = state.routines.map(rt => `
       <div class="routine-row">
         <div>
@@ -1552,6 +1558,10 @@ const WorkoutModule = (() => {
       bodyHTML: `
         <div class="field">
           <button type="button" class="btn ghost sm" id="routineFromRecord">＋ ルーティン作成</button>
+          ${state.routines.length ? `<select id="routineUseSelect" style="margin-top:8px;">
+            <option value="">ルーティンを今日に追加</option>
+            ${state.routines.map(r => `<option value="${r.id}">${escapeHTML(r.name)}</option>`).join('')}
+          </select>` : ''}
         </div>
         <div class="field">
           <label class="field-label">カテゴリー</label>
@@ -1600,6 +1610,12 @@ const WorkoutModule = (() => {
     const menuList = body.querySelector('#menuList');
     const detailArea = body.querySelector('#detailArea');
     body.querySelector('#routineFromRecord').onclick = () => openRoutineModal(null);
+    const routineSelect = body.querySelector('#routineUseSelect');
+    if (routineSelect) routineSelect.onchange = () => {
+      if (!routineSelect.value) return;
+      applyRoutine(routineSelect.value);
+      Modal.close();
+    };
 
     // カテゴリーチップ
     catChips.innerHTML = CATEGORIES.map(c =>
@@ -1821,13 +1837,11 @@ const BodyModule = (() => {
     if (!recs.length) {
       rootEl.innerHTML = `
         <div class="panel">
-          <div class="stats-head"><h2>体組成</h2>
-          </div>
           <div class="empty-state"><div class="big">□</div>記録がありません。手動入力か、InBodyのCSVを取り込んでください。</div>
         </div>
-        <div class="panel"><div class="toolbar"><label class="file-btn">CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label></div></div>
+        <div class="panel"><button class="btn ghost sm" id="bExport">CSV書き出し</button></div>
         <button class="fab" id="bAdd" aria-label="記録追加">＋</button>`;
-      rootEl.querySelector('#bCsv').onchange = handleCSV;
+      rootEl.querySelector('#bExport').onclick = exportCSV;
       rootEl.querySelector('#bAdd').onclick = () => openRecordModal(null);
       return;
     }
@@ -1838,7 +1852,7 @@ const BodyModule = (() => {
     const featuredFields = state.featured.map(bodyField).filter(f => f && last[f.key] != null).slice(0, 3);
     const otherFields = presentFields.filter(f => !featuredFields.some(ff => ff.key === f.key));
     const featured = `<div class="featured-cards">` + featuredFields.map(f => featuredCard(f, last[f.key], prev?.[f.key])).join('') + `</div>`;
-    const cards = `<div class="stat-cards">` + presentFields.map(f => {
+    const cards = `<div class="stat-cards">` + otherFields.map(f => {
       const v = last[f.key], pv = prev?.[f.key];
       const d = (v != null && pv != null) ? round(v - pv, 1) : null;
       return bodyStatCard(f, v, d);
@@ -1850,21 +1864,10 @@ const BodyModule = (() => {
 
     rootEl.innerHTML = `
       <div class="panel">
-        <div class="stats-head">
-          <h2>体組成</h2>
-          <div class="toolbar" style="margin:0;">
-            <button class="btn sm" id="bAdd">＋ 記録を追加</button>
-            <label class="file-btn">CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label>
-            <button class="btn ghost sm" id="bExport">CSV書き出し</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
         <div class="stats-head" style="margin-bottom:6px;">
           <h2 style="font-size:16px;">最新の状態（前回測定比）</h2>
-          <button class="btn ghost sm" id="bFeatured">大きく表示する3項目</button>
           <span class="hint">${last.date}${last.time ? ' ' + last.time : ''} 時点</span>
+          <button class="btn ghost sm" id="bFeatured" style="margin-left:auto;">大きく表示する3項目</button>
         </div>
         ${featured}
         ${cards}
@@ -1907,16 +1910,10 @@ const BodyModule = (() => {
         </div>
         <div id="bTable"></div>
       </div>
-      <div class="panel">
-        <div class="toolbar">
-          <label class="file-btn">CSV取り込み<input type="file" id="bCsv" accept=".csv,text/csv"></label>
-          <button class="btn ghost sm" id="bExport">CSV書き出し</button>
-        </div>
-      </div>
+      <div class="panel"><button class="btn ghost sm" id="bExport">CSV書き出し</button></div>
       <button class="fab" id="bAdd" aria-label="記録追加">＋</button>`;
 
     rootEl.querySelector('#bAdd').onclick = () => openRecordModal(null);
-    rootEl.querySelector('#bCsv').onchange = handleCSV;
     rootEl.querySelector('#bExport').onclick = exportCSV;
     rootEl.querySelector('#bFeatured').onclick = openFeaturedModal;
     rootEl.querySelector('#bZoomReset').onclick = () => Charts.resetZoom('bWeightChart');
@@ -2159,6 +2156,11 @@ const BodyModule = (() => {
       saveLabel: editing ? '更新' : '追加',
       bodyHTML: `
         <div class="field">
+          <div class="toolbar">
+            <label class="file-btn">CSV取り込み<input type="file" id="bCsvModal" accept=".csv,text/csv"></label>
+          </div>
+        </div>
+        <div class="field">
           <label class="field-label">測定日</label>
           <input type="date" id="bDate" value="${editing?.date || dateKey(new Date())}">
         </div>
@@ -2182,6 +2184,7 @@ const BodyModule = (() => {
         Store.save(); redraw(); toast(editing ? '更新しました' : '追加しました');
       },
     });
+    Modal.body.querySelector('#bCsvModal').onchange = handleCSV;
   }
 
   function handleCSV(e) {
@@ -2232,7 +2235,6 @@ const BodyModule = (() => {
       weight: last.weight,
       bodyFat: last.bodyFat,
       smm: last.smm,
-      coachHTML: coachComment(recs),
     };
   }
 
@@ -2264,7 +2266,6 @@ const MealModule = (() => {
     rootEl.innerHTML = `
       <div class="panel">
         <div class="stats-head">
-          <h2>食事管理</h2>
           <div style="display:flex; gap:8px; align-items:center;">
             <button class="icon-btn" id="mPrev">‹</button>
             <button class="btn ghost sm" id="mToday">今日</button>
@@ -2533,32 +2534,23 @@ const TrainerModule = (() => {
   }
 
   function redraw() {
-    const ctx = context();
-    const bodyCoach = ctx.body.coachHTML || `<div class="coach-box"><span class="coach-ava">□</span><div><b>コーチからのひとこと</b><br><span class="hint">体組成を記録すると、ここに変化の分析が表示されます。</span></div></div>`;
     rootEl.innerHTML = `
-      <div class="panel">
-        <div class="stats-head">
-          <h2>AIトレーナー</h2>
-          <button class="btn ghost sm" id="clearChat">履歴クリア</button>
+      <div class="panel" style="border-bottom:none;padding-bottom:0;">
+        <div class="trainer-screen">
+          <div class="trainer-top">
+            <button class="link-btn" type="button">‹</button>
+            <div class="trainer-name">Tralog Trainer</div>
+            <button class="btn ghost sm" id="clearChat">Clear</button>
+          </div>
+          <div class="quick-prompts" style="padding:10px 14px 0;margin:0;">
+            ${['今週のメニュー', '食事改善', '目標相談', '次の胸トレ', '体組成解説'].map(q => `<button class="btn ghost sm" data-prompt="${escapeHTML(q)}">${q}</button>`).join('')}
+          </div>
+          <div class="chat-box" id="chatBox">${state.messages.map(renderMsg).join('')}</div>
+          <div class="chat-input-row">
+            <textarea id="chatInput" rows="1" placeholder="Type message here..."></textarea>
+            <button class="btn" id="sendChat">送信</button>
+          </div>
         </div>
-        ${bodyCoach}
-        <div class="stat-cards">
-          <div class="stat-card"><div class="lbl">目標</div><div class="val" style="font-size:16px;">${escapeHTML(ctx.user.profile.goal || '未設定')}</div></div>
-          <div class="stat-card"><div class="lbl">最新体重</div><div class="val">${ctx.body.weight ?? '-'}<small> kg</small></div></div>
-          <div class="stat-card"><div class="lbl">今日の摂取</div><div class="val">${Math.round(ctx.meal.totals.kcal)}<small> kcal</small></div></div>
-          <div class="stat-card"><div class="lbl">総ボリューム</div><div class="val">${ctx.workout.volume ?? 0}<small> kg</small></div></div>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="quick-prompts">
-          ${['今週のトレーニングメニューを作って', '今日の食事を改善したい', '目標に対して何を変えるべき？', '次の胸トレを提案して', '体組成の変化を解説して'].map(q => `<button class="btn ghost sm" data-prompt="${escapeHTML(q)}">${q}</button>`).join('')}
-        </div>
-        <div class="chat-box" id="chatBox" style="margin-top:16px;">${state.messages.map(renderMsg).join('')}</div>
-        <div class="chat-input-row">
-          <textarea id="chatInput" rows="2" placeholder="AIトレーナーに相談する"></textarea>
-          <button class="btn" id="sendChat">送信</button>
-        </div>
-        <p class="hint" style="margin-top:8px;">現在はモックAIです。API接続後は写真・記録・目標を使った本格的な提案に切り替えます。</p>
       </div>`;
 
     rootEl.querySelector('#clearChat').onclick = () => {
@@ -2575,6 +2567,8 @@ const TrainerModule = (() => {
       input.value = '';
       send(text);
     };
+    const box = rootEl.querySelector('#chatBox');
+    if (box) box.scrollTop = box.scrollHeight;
   }
 
   function renderMsg(m) {
@@ -2590,7 +2584,7 @@ const TrainerModule = (() => {
     Store.save();
     redraw();
     const box = rootEl.querySelector('#chatBox');
-    if (box) box.scrollIntoView({ block: 'end' });
+    if (box) box.scrollTop = box.scrollHeight;
   }
 
   function reply(text, ctx) {
@@ -2607,7 +2601,7 @@ const TrainerModule = (() => {
       return `${goal}に合わせた提案です。\n\n1. メイン種目: ${top} 3〜4セット\n2. 補助種目: 苦手部位を2種目、各10〜12回\n3. 仕上げ: 体幹 or 有酸素 10〜15分\n\n直近の記録が増えるほど、前回重量や疲労を踏まえた提案にできます。`;
     }
     if (/体組成|体重|体脂肪|筋肉|inbody/.test(q)) {
-      return `現在の体組成メモです。\n\n最新: 体重 ${ctx.body.weight ?? '-'}kg / 体脂肪率 ${ctx.body.bodyFat ?? '-'}% / 骨格筋量 ${ctx.body.smm ?? '-'}kg\n${height}\n\nAIトレーナータブ上部の「コーチからのひとこと」も確認してください。変化が少ない時は、トレーニング強度・摂取カロリー・睡眠のどれかを1つだけ調整するのがおすすめです。`;
+      return `現在の体組成メモです。\n\n最新: 体重 ${ctx.body.weight ?? '-'}kg / 体脂肪率 ${ctx.body.bodyFat ?? '-'}% / 骨格筋量 ${ctx.body.smm ?? '-'}kg\n${height}\n\n変化が少ない時は、トレーニング強度・摂取カロリー・睡眠のどれかを1つだけ調整するのがおすすめです。`;
     }
     if (/目標|goal|どう/.test(q)) {
       return `今の目標は「${goal}」ですね。\n\nまず見るべき指標は3つです。\n1. 週のトレーニング頻度\n2. 体重・体脂肪率・骨格筋量の方向\n3. 摂取カロリーとタンパク質量\n\n次に「いつまでに」「どれくらい」を入れると、週単位の行動目標まで落とし込めます。`;
