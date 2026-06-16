@@ -96,7 +96,7 @@
   .footer-inner {
     max-width: 1080px;
     margin: 0 auto;
-    padding: 6px 20px calc(6px + env(safe-area-inset-bottom));
+    padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
     display: block;
     align-items: center;
     gap: 8px;
@@ -122,13 +122,14 @@
     align-items: center;
     justify-content: center;
     gap: 2px;
-    padding: 8px 14px 6px;
+    min-height: 58px;
+    padding: 10px 14px 8px;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
   }
   .tabbar button .tab-ico { font-size: 20px; line-height: 1.2; }
-  .tabbar svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .tabbar button .tab-lbl { font-size: 11px; font-weight: 700; }
+  .tabbar svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tabbar button .tab-lbl { font-size: 12px; font-weight: 800; }
   .tabbar button:hover { color: var(--text); }
   .tabbar button.active { color: var(--primary); border-bottom-color: var(--primary); }
   .tabbar button .soon { font-size: 10px; opacity: 0.8; font-weight: 600; }
@@ -481,9 +482,9 @@
   @media (max-width: 600px) {
     .container { padding: 0 12px 16px; }
     .brand { font-size: 22px; padding: 10px 0; }
-    .tabbar button { padding: 6px 10px 5px; }
-    .tabbar button .tab-ico { font-size: 18px; }
-    .tabbar button .tab-lbl { font-size: 10px; }
+    .tabbar button { min-height: 60px; padding: 9px 10px 7px; }
+    .tabbar button .tab-ico { font-size: 19px; }
+    .tabbar button .tab-lbl { font-size: 11px; }
     .account-btn { padding: 6px 9px; font-size: 12px; }
     .chat-input-row { grid-template-columns: 1fr; }
     .panel { padding: 18px 0; }
@@ -969,7 +970,7 @@ function builtinMenus(catId) {
 
 const FLAT_ICONS = {
   workout: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8"/></svg>',
-  body: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M7 8c0-2.2 2.2-4 5-4s5 1.8 5 4c0 3-2.5 4-5 4s-5 1-5 4c0 2.2 2.2 4 5 4s5-1.8 5-4"/></svg>',
+  body: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14a2 2 0 0 1 2 2v8H3v-8a2 2 0 0 1 2-2z"/><path d="M9 8a3 3 0 0 1 6 0M12 8l2-2"/></svg>',
   meal: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4 3v6c0 2 1.5 3 3 3s3-1 3-3V3M17 3c2 2 3 4.2 3 7 0 3-1.2 5-3 5v6"/></svg>',
   trainer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14v9H8l-3 3V8zM9 12h.01M15 12h.01M12 3v5"/></svg>',
 };
@@ -1569,7 +1570,7 @@ const WorkoutModule = (() => {
         </div>
         <div class="field">
           <label class="field-label">メニュー</label>
-          <div class="menu-list" id="menuList"></div>
+          <select id="menuSelect"></select>
           <div id="menuAdmin" style="margin-top:8px;"></div>
         </div>
         <div id="detailArea"></div>
@@ -1607,7 +1608,7 @@ const WorkoutModule = (() => {
 
     const body = Modal.body;
     const catChips = body.querySelector('#catChips');
-    const menuList = body.querySelector('#menuList');
+    const menuSelect = body.querySelector('#menuSelect');
     const detailArea = body.querySelector('#detailArea');
     body.querySelector('#routineFromRecord').onclick = () => openRoutineModal(null);
     const routineSelect = body.querySelector('#routineUseSelect');
@@ -1632,41 +1633,36 @@ const WorkoutModule = (() => {
 
     function renderMenuList() {
       const menus = menusOf(sel.category);
-      menuList.innerHTML = menus.map(mn => {
-        const active = mn.id === sel.menuId ? 'active' : '';
-        if (mn.builtin) return `<div class="menu-item ${active}" data-mid="${mn.id}"><span class="mi-name">${escapeHTML(mn.name)}</span></div>`;
-        return `<div class="menu-item custom ${active}" data-mid="${mn.id}">
-          <span class="mi-name">${escapeHTML(mn.name)}</span>
-          <span class="mi-actions">
-            <button type="button" class="mi-ico" data-edit-menu="${mn.id}" title="編集">Edit</button>
-            <button type="button" class="mi-ico" data-del-menu="${mn.id}" title="削除">✕</button>
-          </span>
-        </div>`;
-      }).join('') || `<p class="hint">メニューがありません。下のボタンから追加してください。</p>`;
-
-      menuList.querySelectorAll('[data-mid]').forEach(it => it.onclick = () => {
-        const mn = menus.find(x => x.id === it.dataset.mid);
+      menuSelect.innerHTML = `<option value="">メニューを選択</option>` + menus.map(mn =>
+        `<option value="${mn.id}" ${mn.id === sel.menuId ? 'selected' : ''}>${escapeHTML(mn.name)}${mn.builtin ? '' : '（オリジナル）'}</option>`
+      ).join('');
+      menuSelect.onchange = () => {
+        const mn = menus.find(x => x.id === menuSelect.value);
+        if (!mn) { sel.menuId = null; sel.menuName = ''; detailArea.innerHTML = ''; renderMenuAdmin(); return; }
         sel.menuId = mn.id; sel.menuName = mn.name; sel.type = mn.type;
-        menuList.querySelectorAll('.menu-item').forEach(x => x.classList.toggle('active', x === it));
-        renderDetail();
-      });
-      menuList.querySelectorAll('[data-edit-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); adminMode = { mode: 'edit', id: b.dataset.editMenu }; renderMenuAdmin(); });
-      menuList.querySelectorAll('[data-del-menu]').forEach(b => b.onclick = e => {
-        e.stopPropagation();
-        if (!confirm('このオリジナルメニューを削除しますか？')) return;
-        const id = b.dataset.delMenu;
-        state.customMenus = state.customMenus.filter(x => x.id !== id);
-        if (sel.menuId === id) { sel.menuId = null; detailArea.innerHTML = ''; }
-        Store.save(); renderMenuList(); toast('削除しました');
-      });
+        renderDetail(); renderMenuAdmin();
+      };
       renderMenuAdmin();
     }
 
     function renderMenuAdmin() {
       const box = body.querySelector('#menuAdmin');
       if (!adminMode) {
-        box.innerHTML = `<button type="button" class="btn ghost sm" id="addCustomBtn">＋ このカテゴリーにオリジナル種目を追加</button>`;
+        const selectedCustom = state.customMenus.find(m => m.id === sel.menuId);
+        box.innerHTML = `<div class="toolbar">
+          <button type="button" class="btn ghost sm" id="addCustomBtn">＋ オリジナル種目の追加</button>
+          ${selectedCustom ? `<button type="button" class="btn ghost sm" id="editCustomBtn">編集</button><button type="button" class="btn danger sm" id="delCustomBtn">削除</button>` : ''}
+        </div>`;
         box.querySelector('#addCustomBtn').onclick = () => { adminMode = { mode: 'add' }; renderMenuAdmin(); };
+        const editBtn = box.querySelector('#editCustomBtn');
+        if (editBtn) editBtn.onclick = () => { adminMode = { mode: 'edit', id: sel.menuId }; renderMenuAdmin(); };
+        const delBtn = box.querySelector('#delCustomBtn');
+        if (delBtn) delBtn.onclick = () => {
+          if (!confirm('このオリジナルメニューを削除しますか？')) return;
+          state.customMenus = state.customMenus.filter(x => x.id !== sel.menuId);
+          sel.menuId = null; sel.menuName = ''; detailArea.innerHTML = '';
+          Store.save(); renderMenuList(); toast('削除しました');
+        };
         return;
       }
       const editing = adminMode.mode === 'edit' ? state.customMenus.find(m => m.id === adminMode.id) : null;
@@ -1795,7 +1791,7 @@ const WorkoutModule = (() => {
     return { latest, totalRecords, volume: round(volume, 0), menus: loggedMenus().slice(0, 5) };
   }
 
-  return { id: 'workout', label: 'トレーニング記録', icon: FLAT_ICONS.workout, render, summary };
+  return { id: 'workout', label: 'トレーニング', icon: FLAT_ICONS.workout, render, summary };
 })();
 
 /* =====================================================================
@@ -2238,7 +2234,7 @@ const BodyModule = (() => {
     };
   }
 
-  return { id: 'body', label: '体組成記録', icon: FLAT_ICONS.body, render, latestSummary };
+  return { id: 'body', label: '体組成', icon: FLAT_ICONS.body, render, latestSummary };
 })();
 
 /* =====================================================================
@@ -2501,7 +2497,7 @@ const MealModule = (() => {
     return { today, totals: t, targets: state.targets, daysLogged: Object.keys(state.days).length };
   }
 
-  return { id: 'meal', label: '食事管理', icon: FLAT_ICONS.meal, render, summary };
+  return { id: 'meal', label: '食事', icon: FLAT_ICONS.meal, render, summary };
 })();
 
 /* =====================================================================
@@ -2609,7 +2605,7 @@ const TrainerModule = (() => {
     return `相談ありがとうございます。\n\n今の設定は「${goal}」、${height}です。トレーニング・食事・体組成のどれを優先して変えたいか教えてください。具体的には「今週3回行ける」「体脂肪を落としたい」「夕食が重くなりがち」などでOKです。`;
   }
 
-  return { id: 'trainer', label: 'AIトレーナー', icon: FLAT_ICONS.trainer, render };
+  return { id: 'trainer', label: 'トレーナー', icon: FLAT_ICONS.trainer, render };
 })();
 
 /* ---------------- 共通ヘルパ ---------------- */
