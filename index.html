@@ -4,8 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#15181d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Tralog</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='black'/%3E%3Cpath d='M24 28h52M50 28v46' stroke='white' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2315181d'/%3E%3Cpath d='M24 28h52M50 28v46' stroke='%23c3f53c' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
@@ -491,6 +495,23 @@
     .modal-body { max-height: 62vh; }
     .meal-totals { grid-template-columns: repeat(2, 1fr); }
   }
+  /* ===== 年間アクティビティヒートマップ ===== */
+  .heatmap-scroll { overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+  .hm-months { display: flex; gap: 3px; margin-bottom: 4px; }
+  .hm-months span { flex: 0 0 12px; width: 12px; font-size: 10px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: visible; }
+  .hm-grid { display: flex; gap: 3px; }
+  .hm-col { display: flex; flex-direction: column; gap: 3px; }
+  .hm-cell { width: 12px; height: 12px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); }
+  .hm-cell.future { visibility: hidden; }
+  .hm-cell.l1 { background: rgba(195, 245, 60, 0.22); border-color: transparent; }
+  .hm-cell.l2 { background: rgba(195, 245, 60, 0.45); border-color: transparent; }
+  .hm-cell.l3 { background: rgba(195, 245, 60, 0.72); border-color: transparent; }
+  .hm-cell.l4 { background: var(--primary); border-color: transparent; }
+  .hm-cell[data-has="1"] { cursor: pointer; }
+  .hm-cell[data-has="1"]:hover { outline: 2px solid var(--primary); }
+  .hm-legend { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .hm-legend .hm-cell { cursor: default; }
+
   /* ===== レストタイマー ===== */
   .rest-timer {
     position: fixed; left: 50%; transform: translateX(-50%) translateY(16px);
@@ -1168,11 +1189,80 @@ const WorkoutModule = (() => {
     el.innerHTML = `
       <div class="panel" id="heroPanel"></div>
       <div class="panel" id="calPanel"></div>
+      <div class="panel" id="heatPanel"></div>
       <div class="panel" id="statsPanel"></div>
     `;
     renderHero();
     renderCalendar();
+    renderHeatmap();
     renderStats();
+  }
+
+  /* ============ 描画: 年間アクティビティヒートマップ ============ */
+  function renderHeatmap() {
+    const panel = rootEl.querySelector('#heatPanel');
+    if (!panel) return;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayKey = dateKey(today);
+
+    // 日ごとのスコア = 筋トレの実施セット数 + 有酸素1件につき3
+    const score = {};
+    Object.entries(state.records).forEach(([k, list]) => {
+      let s = 0;
+      list.forEach(r => {
+        if (r.type === 'cardio') s += 3;
+        else s += (r.sets || []).filter(x => (x.weight || 0) > 0 || (x.reps || 0) > 0).length || 1;
+      });
+      if (s > 0) score[k] = s;
+    });
+    const lvl = v => v <= 0 ? 0 : v <= 5 ? 1 : v <= 11 ? 2 : v <= 19 ? 3 : 4;
+
+    // 過去52週。週の先頭は日曜
+    const start = new Date(today);
+    start.setDate(start.getDate() - 364);
+    start.setDate(start.getDate() - start.getDay());
+
+    const cols = [];
+    let lastM = -1;
+    const cur = new Date(start);
+    while (cur <= today) {
+      const days = [];
+      for (let i = 0; i < 7; i++) { const d = new Date(cur); d.setDate(cur.getDate() + i); days.push(d); }
+      const m = days[0].getMonth();
+      cols.push({ days, label: m !== lastM ? `${m + 1}月` : '' });
+      lastM = m;
+      cur.setDate(cur.getDate() + 7);
+    }
+
+    let activeDays = 0;
+    const gridHTML = cols.map(col => `<div class="hm-col">${col.days.map(d => {
+      const key = dateKey(d);
+      if (key > todayKey) return `<span class="hm-cell future"></span>`;
+      const v = score[key] || 0;
+      if (v > 0) activeDays++;
+      const has = state.records[key]?.length ? '1' : '0';
+      return `<span class="hm-cell l${lvl(v)}" data-key="${key}" data-has="${has}" title="${key}${v ? `：${v}セット相当` : ''}"></span>`;
+    }).join('')}</div>`).join('');
+
+    panel.innerHTML = `
+      <div class="stats-head">
+        <h2>🔥 アクティビティ</h2>
+        <span class="hint">過去1年で <b style="color:var(--primary)">${activeDays}</b> 日トレーニング</span>
+      </div>
+      <div class="heatmap-scroll" id="hmScroll">
+        <div class="hm-months">${cols.map(c => `<span>${c.label}</span>`).join('')}</div>
+        <div class="hm-grid">${gridHTML}</div>
+        <div class="hm-legend">少 <span class="hm-cell l0"></span><span class="hm-cell l1"></span><span class="hm-cell l2"></span><span class="hm-cell l3"></span><span class="hm-cell l4"></span> 多</div>
+      </div>`;
+
+    // 記録のある日をタップ → その日の詳細モーダル
+    panel.querySelectorAll('.hm-cell[data-has="1"]').forEach(c => c.onclick = () => {
+      selectedKey = c.dataset.key;
+      openDayModal(selectedKey);
+    });
+    // 直近(右端)を初期表示
+    const sc = panel.querySelector('#hmScroll');
+    sc.scrollLeft = sc.scrollWidth;
   }
 
   /* ============ 描画: モチベーションヒーロー ============ */
@@ -1346,7 +1436,7 @@ const WorkoutModule = (() => {
     box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
       if (!confirm('この記録を削除しますか？')) return;
       deleteRecord(selectedKey, b.dataset.del);
-      renderHero(); renderCalendar(); renderStats();
+      renderHero(); renderCalendar(); renderHeatmap(); renderStats();
       renderDayModalBody();
       toast('削除しました');
     });
@@ -1441,7 +1531,7 @@ const WorkoutModule = (() => {
       addRecord(key, rec);
     });
     selectedKey = key;
-    renderHero(); renderCalendar(); renderStats();
+    renderHero(); renderCalendar(); renderHeatmap(); renderStats();
     toast(`${rt.name}を今日の記録に追加しました`);
   }
 
@@ -1715,7 +1805,7 @@ const WorkoutModule = (() => {
           }));
         }
         if (editing) updateRecord(selectedKey, rec); else addRecord(selectedKey, rec);
-        renderHero(); renderCalendar(); renderStats();
+        renderHero(); renderCalendar(); renderHeatmap(); renderStats();
         toast(editing ? '更新しました' : '追加しました');
         if (opts.backToDay) setTimeout(() => openDayModal(selectedKey), 0);
       },
@@ -2749,6 +2839,13 @@ function numOrNull(v) { if (v === '' || v == null) return null; const n = Number
 /* =====================================================================
  *  起動: モジュール登録
  * ===================================================================== */
+/* ---------------- PWA: Service Worker登録 ---------------- */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW登録失敗', e));
+  });
+}
+
 App.registerModule(WorkoutModule);
 App.registerModule(BodyModule);
 App.registerModule(MealModule);
