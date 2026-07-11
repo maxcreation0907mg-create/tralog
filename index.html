@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#15181d">
 <title>Tralog</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='black'/%3E%3Cpath d='M24 28h52M50 28v46' stroke='white' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -11,45 +12,34 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ===== デザイン: ダーク基調 + アクセント1色（ライム） ===== */
   :root {
-    --primary: #3266ad;
-    --primary-dark: #185fa5;
-    --primary-light: rgba(50, 102, 173, 0.1);
-    --success: #639922;
-    --danger: #e24b4a;
-    --warning: #ba7517;
-    --bg: #f5f7fa;
-    --surface: #ffffff;
-    --surface-2: #f9fbff;
-    --border: #e0e3e9;
-    --text: #1a1a1a;
-    --muted: #666;
+    --primary: #c3f53c;            /* アクセント: ライム */
+    --primary-dark: #aede2e;       /* hover用 やや深いライム */
+    --primary-light: rgba(195, 245, 60, 0.14);
+    --on-primary: #131807;         /* ライム上のテキスト色 */
+    --success: #7bd94a;
+    --danger: #ff6b5e;
+    --warning: #f0a83c;
+    --bg: #0d0f13;
+    --surface: #15181d;            /* ページ基調 */
+    --surface-2: #0f1216;          /* インセット面（入力・セル） */
+    --border: #2b303a;
+    --text: #f2f4f6;
+    --muted: #98a1ad;
     --radius: 16px;
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    --shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
 
-    /* カテゴリーカラー（拡張時もここに追記するだけ） */
-    --cat-chest: #e2574c;
-    --cat-arm: #e08e0b;
-    --cat-shoulder: #d4a017;
-    --cat-back: #2f8f5b;
-    --cat-leg: #3266ad;
-    --cat-glute: #b5539c;
-    --cat-abs: #16a3a3;
-    --cat-cardio: #e2574c;
-    --cat-other: #8a8f99;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #15171b;
-      --surface: #20242a;
-      --surface-2: #181b20;
-      --border: #333944;
-      --text: #f2f4f8;
-      --muted: #a3aab6;
-      --primary-light: rgba(50, 102, 173, 0.22);
-      --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-    }
+    /* カテゴリーカラー（ダーク背景向けに明度アップ / 拡張時もここに追記するだけ） */
+    --cat-chest: #ff7a6e;
+    --cat-arm: #ffb347;
+    --cat-shoulder: #ffd34d;
+    --cat-back: #4fd58c;
+    --cat-leg: #5aa3ff;
+    --cat-glute: #e07ad0;
+    --cat-abs: #38d9d9;
+    --cat-cardio: #ff7a6e;
+    --cat-other: #9aa2ae;
   }
 
   body {
@@ -78,7 +68,7 @@
     align-self: center;
     padding: 12px 0;
     line-height: 1.1;
-    background: linear-gradient(120deg, var(--primary), #5fa0e8);
+    background: linear-gradient(120deg, var(--primary), #4fd58c);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -180,7 +170,7 @@
   .icon-btn:hover { border-color: var(--primary); color: var(--primary); }
   .btn {
     border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700;
-    cursor: pointer; transition: 0.15s; background: var(--primary); color: #fff;
+    cursor: pointer; transition: 0.15s; background: var(--primary); color: var(--on-primary);
   }
   .btn:hover { background: var(--primary-dark); }
   .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
@@ -208,7 +198,7 @@
   .cal-cell:hover { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light) inset; }
   .cal-cell.empty { background: transparent; border: none; cursor: default; }
   .cal-cell.today { border-color: var(--primary); }
-  .cal-cell.today .daynum { background: var(--primary); color: #fff; }
+  .cal-cell.today .daynum { background: var(--primary); color: var(--on-primary); }
   .cal-cell.selected { box-shadow: 0 0 0 2px var(--primary) inset; }
   .daynum {
     font-size: 13px; font-weight: 700; width: 24px; height: 24px; border-radius: 50%;
@@ -216,7 +206,7 @@
   }
   .cal-cell.sun .daynum { color: var(--danger); }
   .cal-cell.sat .daynum { color: var(--primary); }
-  .cal-cell.today .daynum { color: #fff; }
+  .cal-cell.today .daynum { color: var(--on-primary); }
   .dots { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; }
   .cell-count {
@@ -289,7 +279,7 @@
     display: inline-flex; align-items: center; gap: 6px; color: var(--text);
   }
   .cat-chip:hover { border-color: var(--primary); }
-  .cat-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .cat-chip.active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
   .cat-chip.active .cat-badge { box-shadow: 0 0 0 2px rgba(255,255,255,0.6); }
 
   .menu-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -433,11 +423,11 @@
     border-radius: 50%;
     border: none;
     background: var(--primary);
-    color: #fff;
+    color: var(--on-primary);
     font-size: 30px;
     line-height: 1;
     cursor: pointer;
-    box-shadow: 0 10px 28px rgba(24, 95, 165, 0.28);
+    box-shadow: 0 10px 28px rgba(195, 245, 60, 0.22);
   }
   .featured-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 0; margin: 14px 0 18px; }
   .featured-card { border-left: 1px solid var(--border); padding-left: 18px; }
@@ -448,7 +438,7 @@
 
   .range-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .range-toggle button { border: none; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 700; padding: 7px 12px; cursor: pointer; }
-  .range-toggle button.active { background: var(--primary); color: #fff; }
+  .range-toggle button.active { background: var(--primary); color: var(--on-primary); }
 
   /* ===== テーブル ===== */
   .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -501,6 +491,33 @@
     .modal-body { max-height: 62vh; }
     .meal-totals { grid-template-columns: repeat(2, 1fr); }
   }
+  /* ===== レストタイマー ===== */
+  .rest-timer {
+    position: fixed; left: 50%; transform: translateX(-50%) translateY(16px);
+    bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 200;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface-2); border: 1.5px solid var(--primary); border-radius: 999px;
+    padding: 8px 12px 8px 16px; box-shadow: var(--shadow);
+    opacity: 0; pointer-events: none; transition: 0.25s;
+  }
+  .rest-timer.on { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+  .rest-timer.done { border-color: var(--success); }
+  .rest-timer .rt-ico { font-size: 16px; }
+  .rest-timer .rt-time {
+    font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: var(--primary); min-width: 56px; text-align: center; letter-spacing: 0.02em;
+  }
+  .rest-timer.done .rt-time { color: var(--success); }
+  .rest-timer button {
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+    border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.15s;
+  }
+  .rest-timer button:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* セット入力の補助行（レストプリセット等） */
+  .rest-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .rest-row .hint { margin: 0; }
+
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
     background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 10px; font-size: 14px;
@@ -544,6 +561,14 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- レストタイマー（モーダルを閉じても継続する常駐ピル） -->
+<div class="rest-timer" id="restTimer" role="timer" aria-live="polite">
+  <span class="rt-ico">⏱</span>
+  <span class="rt-time" id="restTimerTime">0:00</span>
+  <button type="button" id="restTimerPlus">+30s</button>
+  <button type="button" id="restTimerStop" aria-label="タイマー停止">✕</button>
+</div>
+
 <script>
 /* =====================================================================
  *  Workout Tracker  -  単一HTMLアプリ
@@ -565,14 +590,31 @@ const Store = (() => {
     } catch (e) { console.warn('load失敗', e); }
     return { version: 1 };
   }
-  function save() { localStorage.setItem(KEY, JSON.stringify(data)); }
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error('保存失敗', e);
+      try { toast('⚠ データ保存に失敗しました（容量不足の可能性）。バックアップを取ってください'); } catch (_) {}
+    }
+  }
+
+  // 全データのJSONバックアップ / 復元
+  function exportAll() { return JSON.stringify(data, null, 2); }
+  function importAll(json) {
+    const obj = JSON.parse(json);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('不正なバックアップファイルです');
+    data = obj;
+    if (!data.version) data.version = 1;
+    save();
+  }
 
   // モジュールごとの名前空間を取得（無ければ初期値で作成）
   function ns(name, initial = {}) {
     if (!data[name]) { data[name] = initial; save(); }
     return data[name];
   }
-  return { get data() { return data; }, save, ns };
+  return { get data() { return data; }, save, ns, exportAll, importAll };
 })();
 
 /* ---------------- 共通ユーティリティ ---------------- */
@@ -588,6 +630,43 @@ function toast(msg) {
   clearTimeout(toast._t);
   toast._t = setTimeout(() => t.classList.remove('show'), 1800);
 }
+
+/* ---------------- レストタイマー（グローバル常駐） ---------------- */
+const RestTimer = (() => {
+  const el = document.getElementById('restTimer');
+  const timeEl = document.getElementById('restTimerTime');
+  let endAt = null, iv = null;
+
+  function fmt(sec) { return `${Math.floor(sec / 60)}:${pad(sec % 60)}`; }
+
+  function tick() {
+    const rest = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+    timeEl.textContent = fmt(rest);
+    if (rest <= 0) {
+      clearInterval(iv); iv = null;
+      el.classList.add('done');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      toast('レスト終了！次のセットへ 💪');
+      setTimeout(() => { if (!iv) hide(); }, 3000);
+    }
+  }
+  function run() { clearInterval(iv); iv = setInterval(tick, 250); tick(); }
+  function start(sec) {
+    endAt = Date.now() + sec * 1000;
+    el.classList.add('on'); el.classList.remove('done');
+    run();
+  }
+  function hide() { el.classList.remove('on', 'done'); clearInterval(iv); iv = null; endAt = null; }
+
+  document.getElementById('restTimerPlus').onclick = () => {
+    if (!endAt) return;
+    endAt = Math.max(endAt, Date.now()) + 30000;
+    el.classList.remove('done');
+    run();
+  };
+  document.getElementById('restTimerStop').onclick = hide;
+  return { start };
+})();
 
 /* ---------------- 数値 / 日付ヘルパ ---------------- */
 function parseNum(v) {
@@ -832,6 +911,15 @@ const UserSettings = (() => {
             </div>
           </div>
         </div>
+        <div class="settings-section" data-section="data">
+          <div class="settings-section-title">データ管理</div>
+          <div class="toolbar">
+            <button type="button" class="btn ghost sm" id="backupBtn">💾 バックアップ（JSON）</button>
+            <button type="button" class="btn ghost sm" id="restoreBtn">📂 復元（JSON読込）</button>
+            <input type="file" id="restoreFile" accept=".json,application/json" style="display:none">
+          </div>
+          <p class="hint">トレーニング・体組成・食事・設定の全データを1ファイルに保存/復元します。データはこのブラウザ内にしか無いため、機種変更・ブラウザ削除に備えて定期的な保存をおすすめします。</p>
+        </div>
         <div class="estimate-box">
           <b>同期ステータス</b><br>
           <span class="hint">Mock mode: 画面と保存構造のみ。実同期はSupabase/Firebase接続時に有効化します。</span>
@@ -856,6 +944,32 @@ const UserSettings = (() => {
     const email = Modal.body.querySelector('#uEmail');
     const preview = Modal.body.querySelector('#syncIdPreview');
     email.oninput = () => preview.textContent = `同期ID: ${syncId(email.value.trim()) || '-'}`;
+
+    // データ管理: バックアップ / 復元
+    Modal.body.querySelector('#backupBtn').onclick = () => {
+      downloadFile(`tralog-backup-${dateKey(new Date())}.json`, Store.exportAll(), 'application/json;charset=utf-8');
+      toast('バックアップを書き出しました');
+    };
+    const restoreFile = Modal.body.querySelector('#restoreFile');
+    Modal.body.querySelector('#restoreBtn').onclick = () => restoreFile.click();
+    restoreFile.onchange = () => {
+      const file = restoreFile.files && restoreFile.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          if (!confirm('現在のデータをバックアップの内容で上書きします。よろしいですか？')) { restoreFile.value = ''; return; }
+          Store.importAll(reader.result);
+          toast('復元しました。再読み込みします…');
+          setTimeout(() => location.reload(), 600);
+        } catch (e) {
+          console.error(e);
+          toast('復元に失敗しました。ファイルを確認してください');
+          restoreFile.value = '';
+        }
+      };
+      reader.readAsText(file);
+    };
   }
 
   return { init, get state() { return state; }, openSettings };
@@ -1514,6 +1628,7 @@ const WorkoutModule = (() => {
         type: 'line',
         data: { labels, datasets: [
           { label: '最大重量(kg)', data: maxW, borderColor: cssVar('--primary'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y', spanGaps: true },
+          { label: '推定1RM(kg)', data: e1rm, borderColor: cssVar('--cat-leg'), backgroundColor: 'transparent', tension: 0.3, yAxisID: 'y', spanGaps: true, borderDash: [2, 3] },
           { label: 'ボリューム(kg)', data: vol, borderColor: cssVar('--cat-glute'), backgroundColor: 'transparent', borderDash: [5, 4], tension: 0.3, yAxisID: 'y1', spanGaps: true },
         ] },
         options: { plugins: { zoom: zoomOpts(labels.length - 1) }, scales: { x: { ticks: edgeXTicks(labels.length) }, y: { position: 'left', title: { display: true, text: 'kg', color: cssVar('--muted') } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } },
@@ -1727,12 +1842,31 @@ const WorkoutModule = (() => {
           <div class="field">
             <label class="field-label">セット（重量 × 回数）</label>
             <div class="sets-editor" id="setsEditor"></div>
-            <button type="button" class="btn ghost sm" id="addSetBtn">＋ セットを追加</button>
+            <div class="toolbar">
+              <button type="button" class="btn ghost sm" id="addSetBtn">＋ セット追加</button>
+              <button type="button" class="btn ghost sm" id="addSetUpBtn">＋2.5kgで追加</button>
+            </div>
+            <div class="rest-row">
+              <span class="hint">レスト:</span>
+              ${[60, 90, 120, 180].map(s => `<button type="button" class="btn ghost sm" data-rest="${s}">${s < 120 ? s + '秒' : (s / 60) + '分'}</button>`).join('')}
+            </div>
           </div>`;
         const editor = detailArea.querySelector('#setsEditor');
         const initial = editing?.sets?.length ? editing.sets : [{ weight: '', reps: '' }, { weight: '', reps: '' }, { weight: '', reps: '' }];
         initial.forEach(s => addSetRow(editor, s));
-        detailArea.querySelector('#addSetBtn').onclick = () => addSetRow(editor, { weight: '', reps: '' });
+        // 「＋セット追加」は前セットの値を引き継ぐ（ジムでの入力を最短に）
+        const lastRowVals = () => {
+          const rows = editor.querySelectorAll('.set-row');
+          const last = rows[rows.length - 1];
+          return last ? { weight: last.querySelector('.in-weight').value, reps: last.querySelector('.in-reps').value } : { weight: '', reps: '' };
+        };
+        detailArea.querySelector('#addSetBtn').onclick = () => addSetRow(editor, lastRowVals());
+        detailArea.querySelector('#addSetUpBtn').onclick = () => {
+          const v = lastRowVals();
+          const w = parseFloat(v.weight);
+          addSetRow(editor, { weight: Number.isFinite(w) ? round(w + 2.5, 2) : '', reps: v.reps });
+        };
+        detailArea.querySelectorAll('[data-rest]').forEach(b => b.onclick = () => RestTimer.start(+b.dataset.rest));
         const copyBtn = detailArea.querySelector('#copyPrev');
         if (copyBtn) copyBtn.onclick = () => {
           editor.innerHTML = '';
@@ -2049,7 +2183,7 @@ const BodyModule = (() => {
     const labels = recs.map(r => fmtMonthDay(r.date));
     Charts.draw('bWeightChart', {
       type: 'line',
-      data: { labels, datasets: [{ label: '体重(kg)', data: recs.map(r => r.weight ?? null), borderColor: cssVar('--primary'), backgroundColor: 'rgba(50,102,173,0.12)', fill: true, tension: 0.3, spanGaps: true, borderWidth: 2 }] },
+      data: { labels, datasets: [{ label: '体重(kg)', data: recs.map(r => r.weight ?? null), borderColor: cssVar('--primary'), backgroundColor: 'rgba(195,245,60,0.10)', fill: true, tension: 0.3, spanGaps: true, borderWidth: 2 }] },
       options: lineOpts(recs, { y: {} }),
     });
     Charts.draw('bCompChart', {
