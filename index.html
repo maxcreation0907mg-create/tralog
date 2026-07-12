@@ -512,6 +512,33 @@
   .hm-legend { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 6px; font-size: 11px; color: var(--muted); }
   .hm-legend .hm-cell { cursor: default; }
 
+  /* ===== 食品DB検索 / マイ定番 ===== */
+  .fav-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .fav-chips:empty { display: none; }
+  .food-results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .food-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    width: 100%; text-align: left; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 12px; color: var(--text); font-size: 13.5px; font-weight: 600; transition: 0.15s;
+  }
+  .food-row:hover { border-color: var(--primary); }
+  .food-row .food-kcal { color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+  /* ===== AIトレーナー: バッジ・タイピング ===== */
+  .ai-badge {
+    display: inline-block; vertical-align: middle; margin-left: 6px;
+    font-size: 10px; font-weight: 900; letter-spacing: 0.08em;
+    padding: 2px 7px; border-radius: 999px;
+    background: var(--primary); color: var(--on-primary);
+  }
+  .ai-badge.off { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .typing { display: inline-flex; gap: 4px; align-items: center; padding: 4px 2px; }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: typing-b 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: 0.2s; }
+  .typing i:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-b { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
   /* ===== レストタイマー ===== */
   .rest-timer {
     position: fixed; left: 50%; transform: translateX(-50%) translateY(16px);
@@ -870,8 +897,10 @@ const UserSettings = (() => {
   const state = Store.ns('user', {
     account: { email: '', displayName: '', syncId: '' },
     profile: { heightCm: '', age: '', sex: '', goal: '筋肉を増やす', activity: '週2-3回' },
+    ai: { proxyUrl: '', appToken: '' },
     setupDone: false,
   });
+  if (!state.ai) { state.ai = { proxyUrl: '', appToken: '' }; Store.save(); }
 
   function init() {
     const btn = document.getElementById('accountBtn');
@@ -932,6 +961,18 @@ const UserSettings = (() => {
             </div>
           </div>
         </div>
+        <div class="settings-section" data-section="ai">
+          <div class="settings-section-title">AI連携（Claudeトレーナー / 写真解析）</div>
+          <div class="field">
+            <label class="hint">プロキシURL（Cloudflare Workers）</label>
+            <input id="uAiUrl" type="url" placeholder="https://tralog-ai.xxxx.workers.dev" value="${escapeHTML(state.ai.proxyUrl || '')}">
+          </div>
+          <div class="field">
+            <label class="hint">アクセストークン（Workers側でAPP_TOKENを設定した場合）</label>
+            <input id="uAiToken" type="password" placeholder="任意" value="${escapeHTML(state.ai.appToken || '')}">
+          </div>
+          <p class="hint">未設定でも動作します（トレーナーは簡易応答・写真解析はモック）。設定するとAIトレーナー・食事写真解析・InBody写真読み取りが有効になります。</p>
+        </div>
         <div class="settings-section" data-section="data">
           <div class="settings-section-title">データ管理</div>
           <div class="toolbar">
@@ -956,6 +997,8 @@ const UserSettings = (() => {
         state.profile.sex = body.querySelector('#uSex').value;
         state.profile.goal = body.querySelector('#uGoal').value;
         state.profile.activity = body.querySelector('#uActivity').value;
+        state.ai.proxyUrl = body.querySelector('#uAiUrl').value.trim().replace(/\/+$/, '');
+        state.ai.appToken = body.querySelector('#uAiToken').value.trim();
         state.setupDone = true;
         Store.save();
         renderButton();
@@ -994,6 +1037,62 @@ const UserSettings = (() => {
   }
 
   return { init, get state() { return state; }, openSettings };
+})();
+
+/* =====================================================================
+ *  AI連携: Cloudflare Workersプロキシ経由でClaude API(Messages)を呼ぶ
+ *  - APIキーはWorker側Secretにあり、ブラウザには存在しない
+ * ===================================================================== */
+const AI = (() => {
+  function conf() { return UserSettings.state.ai || {}; }
+  function enabled() { return !!(conf().proxyUrl || '').trim(); }
+
+  async function chat({ system, messages, maxTokens = 1024 }) {
+    const url = (conf().proxyUrl || '').trim();
+    if (!url) { const e = new Error('AI未設定'); e.code = 'NO_PROXY'; throw e; }
+    const headers = { 'content-type': 'application/json' };
+    const token = (conf().appToken || '').trim();
+    if (token) headers['x-tralog-key'] = token;
+    let res;
+    try {
+      res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ system, messages, max_tokens: maxTokens }) });
+    } catch (e) { throw new Error('通信エラー（オフライン or URL誤り）'); }
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok || data?.error) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+    return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+  }
+
+  // 画像を縮小+JPEG化してAPIのimageブロックに（通信量・トークン節約）
+  function fileToImageBlock(file, maxDim = 1400, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const u = URL.createObjectURL(file);
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: dataUrl.split(',')[1] } });
+        } catch (e) { reject(e); }
+        finally { URL.revokeObjectURL(u); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); reject(new Error('画像を読み込めませんでした')); };
+      img.src = u;
+    });
+  }
+
+  // 応答テキストからJSONを頑健に取り出す
+  function parseJSON(text) {
+    const clean = String(text).replace(/```json|```/g, '').trim();
+    const m = clean.match(/\{[\s\S]*\}/);
+    return JSON.parse(m ? m[0] : clean);
+  }
+
+  return { enabled, chat, fileToImageBlock, parseJSON };
 })();
 
 /* =====================================================================
@@ -2015,7 +2114,61 @@ const WorkoutModule = (() => {
     return { latest, totalRecords, volume: round(volume, 0), menus: loggedMenus().slice(0, 5) };
   }
 
-  return { id: 'workout', label: 'トレーニング', icon: FLAT_ICONS.workout, render, summary };
+  // ルールエンジン用の詳細分析（部位別ボリューム / 種目別の伸び / 停滞検知）
+  function analysis() {
+    const days = Object.keys(state.records).sort();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const daysAgo = n => { const d = new Date(today); d.setDate(d.getDate() - n); return dateKey(d); };
+    const wk0 = daysAgo(6), wk1s = daysAgo(13), wk1e = daysAgo(7);
+
+    const catStats = {};   // catId -> { vol7, vol7prev, lastDate, count7 }
+    const menuMap = {};    // menuName -> セッション履歴
+    days.forEach(k => {
+      (state.records[k] || []).forEach(r => {
+        const cat = r.category || 'other';
+        const cs = catStats[cat] = catStats[cat] || { vol7: 0, vol7prev: 0, lastDate: null, count7: 0 };
+        cs.lastDate = k;
+        if (r.type === 'cardio') { if (k >= wk0) cs.count7++; return; }
+        const sets = (r.sets || []).filter(x => (x.weight || 0) > 0 || (x.reps || 0) > 0);
+        const vol = sets.reduce((a, x) => a + (x.weight || 0) * (x.reps || 0), 0);
+        if (k >= wk0) { cs.vol7 += vol; cs.count7++; }
+        else if (k >= wk1s && k <= wk1e) cs.vol7prev += vol;
+        const name = r.menuName || r.menuId || '不明';
+        const top = sets.reduce((m, x) => Math.max(m, x.weight || 0), 0);
+        const e1 = sets.reduce((m, x) => Math.max(m, (x.weight || 0) * (1 + (x.reps || 0) / 30)), 0);
+        const workSets = sets.filter(x => (x.weight || 0) >= top * 0.9 && top > 0);
+        const minReps = workSets.length ? Math.min(...workSets.map(x => x.reps || 0)) : 0;
+        (menuMap[name] = menuMap[name] || []).push({ date: k, category: cat, sets: sets.length, topWeight: top, e1rm: round(e1, 1), minReps, volume: vol });
+      });
+    });
+
+    // 種目ごとの次回提案（漸進性過負荷ルール）
+    const progress = Object.entries(menuMap).map(([name, hist]) => {
+      const last = hist[hist.length - 1], prev = hist[hist.length - 2] || null;
+      let advice = 'keep', nextWeight = last.topWeight;
+      if (last.topWeight > 0) {
+        if (last.minReps >= 10) { advice = 'up'; nextWeight = round(last.topWeight + 2.5, 1); }
+        else if (last.minReps > 0 && last.minReps <= 5 && last.sets >= 2) { advice = 'down'; nextWeight = round(last.topWeight * 0.9, 1); }
+      }
+      return { name, category: last.category, last, prev, advice, nextWeight, sessions: hist.length };
+    }).sort((a, b) => b.last.date.localeCompare(a.last.date));
+
+    // 停滞検知: 直近3週の推定1RMベストが、その前3週を超えていない
+    const d21 = daysAgo(20), d42 = daysAgo(41);
+    const stagnant = [];
+    Object.entries(menuMap).forEach(([name, hist]) => {
+      if (hist.length < 4) return;
+      const best = p => Math.max(0, ...hist.filter(h => p(h.date)).map(h => h.e1rm));
+      const cur = best(d => d >= d21), before = best(d => d >= d42 && d < d21);
+      if (before > 0 && cur > 0 && cur <= before) stagnant.push({ name, cur, before });
+    });
+
+    const lastDay = days[days.length - 1] || null;
+    const daysSince = lastDay ? Math.round((today - new Date(lastDay + 'T00:00:00')) / 86400000) : null;
+    return { catStats, progress, stagnant, lastDay, daysSince, trainedDays7: days.filter(k => k >= wk0).length };
+  }
+
+  return { id: 'workout', label: 'トレーニング', icon: FLAT_ICONS.workout, render, summary, analysis };
 })();
 
 /* =====================================================================
@@ -2378,7 +2531,9 @@ const BodyModule = (() => {
         <div class="field">
           <div class="toolbar">
             <label class="file-btn">CSV取り込み<input type="file" id="bCsvModal" accept=".csv,text/csv"></label>
+            <label class="file-btn">📷 InBody写真から読み取り<input type="file" id="bPhotoModal" accept="image/*" capture="environment"></label>
           </div>
+          <p class="hint" id="bPhotoStatus"></p>
         </div>
         <div class="field">
           <label class="field-label">測定日</label>
@@ -2405,6 +2560,33 @@ const BodyModule = (() => {
       },
     });
     Modal.body.querySelector('#bCsvModal').onchange = handleCSV;
+    Modal.body.querySelector('#bPhotoModal').onchange = async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const status = Modal.body.querySelector('#bPhotoStatus');
+      if (!AI.enabled()) { status.textContent = '⚙設定の「AI連携」を設定すると写真読み取りが使えます'; return; }
+      status.textContent = '📷 InBody写真を解析中…（数秒かかります）';
+      try {
+        const imgBlock = await AI.fileToImageBlock(file, 1600, 0.9);
+        const keyList = BODY_FIELDS.map(f => `"${f.key}"=${f.label}${f.unit ? '(' + f.unit + ')' : ''}`).join(', ');
+        const text = await AI.chat({
+          system: 'InBody等の体組成測定結果シート・画面の読み取りを行う。回答はJSONのみ。説明文・コードブロック記法は禁止。画像から読み取れない項目はJSONに含めない。',
+          messages: [{ role: 'user', content: [imgBlock, { type: 'text', text: `画像から次の項目の数値を読み取り、JSONのみで返答。キー: ${keyList}。測定日が読めた場合は "date":"YYYY-MM-DD" も含める。値はすべて数値（dateのみ文字列）。` }] }],
+          maxTokens: 500,
+        });
+        const j = AI.parseJSON(text);
+        let filled = 0;
+        BODY_FIELDS.forEach(f => {
+          const v = parseNum(j[f.key]);
+          if (v != null) { Modal.body.querySelector('#bf_' + f.key).value = v; filled++; }
+        });
+        if (typeof j.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(j.date)) Modal.body.querySelector('#bDate').value = j.date;
+        status.textContent = filled ? `✅ ${filled}項目を読み取りました。内容を確認して保存してください` : '数値を読み取れませんでした。写真の明るさ・角度を変えてお試しください';
+      } catch (err) {
+        console.error(err);
+        status.textContent = '解析に失敗しました: ' + err.message;
+      }
+    };
   }
 
   function handleCSV(e) {
@@ -2458,15 +2640,152 @@ const BodyModule = (() => {
     };
   }
 
-  return { id: 'body', label: '体組成', icon: FLAT_ICONS.body, render, latestSummary };
+  // 直近と約2週間前の比較トレンド
+  function trend() {
+    const recs = [...state.records].filter(r => r.date).sort((a, b) => a.date.localeCompare(b.date));
+    if (recs.length < 2) return null;
+    const last = recs[recs.length - 1];
+    const cutoff = new Date(last.date + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 14);
+    const cutKey = dateKey(cutoff);
+    let base = recs[0];
+    for (const r of recs) { if (r.date <= cutKey) base = r; }
+    if (base.date === last.date) base = recs[recs.length - 2];
+    const days = Math.max(1, Math.round((new Date(last.date) - new Date(base.date)) / 86400000));
+    const d = k => (last[k] != null && base[k] != null) ? round(last[k] - base[k], 1) : null;
+    return { last, base, days, dWeight: d('weight'), dFat: d('bodyFat'), dSmm: d('smm') };
+  }
+
+  return { id: 'body', label: '体組成', icon: FLAT_ICONS.body, render, latestSummary, trend };
 })();
 
 /* =====================================================================
  *  食事管理 Module（カロリー・PFC記録 / 目標 / 推移）
  * ===================================================================== */
 const MEAL_TYPES = ['朝食', '昼食', '夕食', '間食', '食事写真'];
+
+// 食品データベース（1食あたりの目安値。k=kcal, p/f/c=g）
+const FOOD_DB = [
+  // 主食
+  { n: '白米 茶碗1杯(150g)', k: 234, p: 3.8, f: 0.5, c: 53.4 },
+  { n: '白米 大盛り(250g)', k: 390, p: 6.3, f: 0.8, c: 89 },
+  { n: '玄米 茶碗1杯(150g)', k: 228, p: 4.2, f: 1.5, c: 51 },
+  { n: 'おにぎり(鮭) 1個', k: 180, p: 5, f: 1.5, c: 37 },
+  { n: 'おにぎり(ツナマヨ) 1個', k: 220, p: 5, f: 8, c: 34 },
+  { n: '食パン 6枚切り1枚', k: 150, p: 5.3, f: 2.5, c: 28 },
+  { n: 'うどん 1玉', k: 250, p: 6.5, f: 1, c: 54 },
+  { n: 'そば 1玉', k: 270, p: 10, f: 2, c: 52 },
+  { n: 'パスタ(乾麺100g茹で)', k: 350, p: 12, f: 2, c: 70 },
+  { n: 'オートミール 40g', k: 150, p: 5.5, f: 2.3, c: 27 },
+  { n: '中華麺 1玉', k: 280, p: 9, f: 1.5, c: 56 },
+  { n: 'もち 1個(50g)', k: 112, p: 2, f: 0.3, c: 25 },
+  { n: 'バナナ 1本', k: 93, p: 1.1, f: 0.2, c: 24 },
+  { n: 'さつまいも 100g', k: 130, p: 1.2, f: 0.2, c: 32 },
+  // 肉
+  { n: '鶏むね肉(皮なし) 100g', k: 113, p: 23.3, f: 1.9, c: 0.1 },
+  { n: '鶏むね肉(皮なし) 200g', k: 226, p: 46.6, f: 3.8, c: 0.2 },
+  { n: '鶏もも肉(皮なし) 100g', k: 128, p: 19, f: 5, c: 0 },
+  { n: '鶏もも肉(皮つき) 100g', k: 204, p: 16.6, f: 14.2, c: 0 },
+  { n: 'ささみ 2本(90g)', k: 95, p: 21, f: 0.7, c: 0 },
+  { n: 'サラダチキン 1個(110g)', k: 120, p: 25, f: 1.5, c: 1 },
+  { n: '豚ロース 100g', k: 248, p: 19.3, f: 19.2, c: 0.2 },
+  { n: '豚ヒレ 100g', k: 118, p: 22.2, f: 3.7, c: 0.3 },
+  { n: '豚バラ 100g', k: 366, p: 14.4, f: 35.4, c: 0.1 },
+  { n: '牛もも赤身 100g', k: 176, p: 21.3, f: 10.7, c: 0.5 },
+  { n: '牛カルビ 100g', k: 380, p: 12.8, f: 37.4, c: 0.2 },
+  { n: 'ひき肉(豚) 100g', k: 209, p: 17.7, f: 17.2, c: 0.1 },
+  { n: 'ハム 2枚', k: 40, p: 5, f: 2, c: 0.5 },
+  { n: 'ウインナー 2本', k: 130, p: 5, f: 12, c: 1 },
+  // 魚介
+  { n: '鮭 1切れ(80g)', k: 106, p: 17.8, f: 3.3, c: 0.1 },
+  { n: 'さば 1切れ(80g)', k: 169, p: 16.5, f: 13.4, c: 0.2 },
+  { n: 'さば缶(水煮) 1缶', k: 340, p: 41, f: 21, c: 0.4 },
+  { n: 'ツナ缶(水煮) 1缶', k: 70, p: 16, f: 0.7, c: 0.2 },
+  { n: 'ツナ缶(油漬け) 1缶', k: 187, p: 12, f: 15, c: 0.1 },
+  { n: 'まぐろ赤身 刺身5切れ', k: 62, p: 13.2, f: 0.7, c: 0.1 },
+  { n: 'えび 5尾', k: 45, p: 10, f: 0.2, c: 0 },
+  { n: 'ちくわ 2本', k: 70, p: 7.3, f: 1.2, c: 8 },
+  { n: 'カニカマ 3本', k: 40, p: 5, f: 0.2, c: 4.5 },
+  // 卵・乳製品
+  { n: 'ゆで卵 1個', k: 71, p: 6.2, f: 5, c: 0.2 },
+  { n: '卵 2個(目玉焼き)', k: 180, p: 12.5, f: 13.5, c: 0.5 },
+  { n: '牛乳 コップ1杯(200ml)', k: 122, p: 6.6, f: 7.6, c: 9.6 },
+  { n: '低脂肪乳 200ml', k: 92, p: 7.6, f: 2, c: 11 },
+  { n: 'ヨーグルト(無糖) 100g', k: 56, p: 3.6, f: 3, c: 4.9 },
+  { n: 'ギリシャヨーグルト 1個(100g)', k: 60, p: 10, f: 0, c: 5 },
+  { n: 'プロセスチーズ 1個', k: 60, p: 4, f: 4.7, c: 0.3 },
+  { n: 'カッテージチーズ 50g', k: 50, p: 6.6, f: 2.3, c: 1 },
+  // 大豆
+  { n: '納豆 1パック', k: 95, p: 8.3, f: 5, c: 6 },
+  { n: '豆腐 半丁(150g)', k: 84, p: 7.4, f: 4.8, c: 2.4 },
+  { n: '無調整豆乳 200ml', k: 92, p: 7.4, f: 4, c: 6.2 },
+  { n: '枝豆 100g(可食部)', k: 125, p: 11.7, f: 6.2, c: 8.8 },
+  { n: 'ミックスナッツ 25g', k: 155, p: 5, f: 13.5, c: 5 },
+  // 野菜・汁物
+  { n: 'サラダ(ドレッシング込)', k: 80, p: 2, f: 5, c: 7 },
+  { n: 'ブロッコリー 100g', k: 37, p: 5.4, f: 0.6, c: 6.6 },
+  { n: 'アボカド 半分', k: 90, p: 1, f: 8.5, c: 4 },
+  { n: 'ミニトマト 5個', k: 15, p: 0.5, f: 0.1, c: 3.5 },
+  { n: '味噌汁 1杯', k: 40, p: 2.5, f: 1.2, c: 5 },
+  { n: '野菜ジュース 200ml', k: 68, p: 1.5, f: 0, c: 15 },
+  // 定食・丼・外食
+  { n: '牛丼 並盛', k: 635, p: 20, f: 20, c: 92 },
+  { n: '親子丼', k: 680, p: 30, f: 18, c: 95 },
+  { n: 'カツ丼', k: 900, p: 30, f: 32, c: 115 },
+  { n: 'カレーライス', k: 760, p: 15, f: 24, c: 115 },
+  { n: 'チャーハン 1人前', k: 700, p: 15, f: 25, c: 98 },
+  { n: 'ラーメン(醤油)', k: 470, p: 22, f: 10, c: 70 },
+  { n: 'ラーメン(豚骨)', k: 550, p: 23, f: 20, c: 66 },
+  { n: 'つけ麺', k: 750, p: 30, f: 18, c: 110 },
+  { n: 'ざるそば', k: 330, p: 13, f: 2.5, c: 62 },
+  { n: 'かけうどん', k: 320, p: 9, f: 1.5, c: 63 },
+  { n: 'ミートソースパスタ', k: 650, p: 22, f: 20, c: 90 },
+  { n: 'カルボナーラ', k: 780, p: 25, f: 38, c: 80 },
+  { n: '焼き魚定食', k: 550, p: 30, f: 14, c: 72 },
+  { n: '生姜焼き定食', k: 750, p: 28, f: 30, c: 85 },
+  { n: 'からあげ定食', k: 850, p: 32, f: 35, c: 95 },
+  { n: '刺身定食', k: 520, p: 32, f: 8, c: 74 },
+  { n: '寿司 10貫', k: 450, p: 25, f: 5, c: 72 },
+  { n: 'ハンバーグ 1個(150g)', k: 340, p: 20, f: 22, c: 12 },
+  { n: 'ハンバーガー 1個', k: 300, p: 13, f: 12, c: 33 },
+  { n: 'チーズバーガー 1個', k: 340, p: 16, f: 15, c: 34 },
+  { n: 'フライドポテト M', k: 320, p: 4, f: 16, c: 41 },
+  { n: 'ピザ 2切れ', k: 440, p: 18, f: 18, c: 52 },
+  { n: '餃子 6個', k: 300, p: 11, f: 15, c: 30 },
+  { n: 'からあげ 4個', k: 290, p: 17, f: 19, c: 10 },
+  { n: '牛皿(並)', k: 260, p: 14, f: 18, c: 8 },
+  { n: 'サンドイッチ(たまご)', k: 320, p: 10, f: 18, c: 28 },
+  { n: 'サンドイッチ(ハムレタス)', k: 250, p: 10, f: 10, c: 30 },
+  { n: '幕の内弁当', k: 700, p: 25, f: 20, c: 100 },
+  { n: 'のり弁当', k: 720, p: 18, f: 22, c: 110 },
+  // コンビニ・間食
+  { n: 'プロテイン 1杯(水)', k: 110, p: 21, f: 1.5, c: 3 },
+  { n: 'プロテインバー 1本', k: 180, p: 15, f: 8, c: 12 },
+  { n: 'ザバスミルクプロテイン 1本', k: 100, p: 15, f: 0, c: 10 },
+  { n: 'ゆでたまご(コンビニ) 1個', k: 66, p: 6, f: 4.4, c: 0.6 },
+  { n: 'ホットスナックチキン 1個', k: 200, p: 12, f: 12, c: 11 },
+  { n: '肉まん 1個', k: 250, p: 9, f: 8, c: 36 },
+  { n: 'カップ麺 1個', k: 350, p: 10, f: 14, c: 46 },
+  { n: 'ポテトチップス 1袋(60g)', k: 336, p: 3, f: 21, c: 33 },
+  { n: 'チョコレート 5かけ(25g)', k: 140, p: 1.8, f: 8.5, c: 14 },
+  { n: 'アイスクリーム 1個', k: 220, p: 4, f: 12, c: 24 },
+  { n: 'シュークリーム 1個', k: 230, p: 5, f: 14, c: 20 },
+  { n: 'どら焼き 1個', k: 220, p: 5, f: 2.5, c: 45 },
+  { n: 'せんべい 2枚', k: 110, p: 2, f: 0.5, c: 24 },
+  { n: 'カステラ 1切れ', k: 160, p: 3.5, f: 2.5, c: 31 },
+  { n: 'クッキー 3枚', k: 150, p: 2, f: 7, c: 20 },
+  // 飲料・酒
+  { n: 'オレンジジュース 200ml', k: 84, p: 1.4, f: 0.2, c: 21 },
+  { n: 'スポーツドリンク 500ml', k: 125, p: 0, f: 0, c: 31 },
+  { n: 'コーラ 500ml', k: 225, p: 0, f: 0, c: 56.5 },
+  { n: 'カフェラテ(ミルク) 1杯', k: 120, p: 6, f: 6.5, c: 9 },
+  { n: 'ビール 500ml', k: 200, p: 1.5, f: 0, c: 15.5 },
+  { n: 'ハイボール 1杯', k: 100, p: 0, f: 0, c: 0 },
+  { n: '日本酒 1合', k: 185, p: 0.7, f: 0, c: 8 },
+  { n: 'ワイン グラス1杯', k: 90, p: 0.2, f: 0, c: 2.5 },
+];
 const MealModule = (() => {
-  const state = Store.ns('meal', { days: {}, targets: { kcal: 2000, p: 120, f: 60, c: 250 } });
+  const state = Store.ns('meal', { days: {}, targets: { kcal: 2000, p: 120, f: 60, c: 250 }, favorites: [] });
+  if (!state.favorites) { state.favorites = []; Store.save(); }
   let selectedKey = dateKey(new Date());
   let rootEl = null;
 
@@ -2599,6 +2918,12 @@ const MealModule = (() => {
           <select id="mType">${MEAL_TYPES.map(tp => `<option ${editing?.type === tp ? 'selected' : ''}>${tp}</option>`).join('')}</select>
         </div>
         <div class="field">
+          <label class="field-label">かんたん入力</label>
+          <div class="fav-chips" id="mFavChips">${state.favorites.slice(0, 8).map((fv, i) => `<button type="button" class="cat-chip" data-fav="${i}">★ ${escapeHTML(fv.name)}</button>`).join('')}</div>
+          <input id="mSearch" placeholder="🔍 食品を検索（例: 鶏むね、白米、ラーメン）" autocomplete="off">
+          <div id="mSearchResults" class="food-results"></div>
+        </div>
+        <div class="field">
           <label class="field-label">メニュー名</label>
           <input id="mName" placeholder="例: 鶏むね肉とごはん" value="${editing?.name ? escapeHTML(editing.name) : ''}">
         </div>
@@ -2611,6 +2936,7 @@ const MealModule = (() => {
             <div><label class="hint">C 炭水化物(g)</label><input type="number" id="mC" min="0" step="0.1" value="${editing?.c ?? ''}" placeholder="60"></div>
           </div>
           <p class="hint" id="mCalc"></p>
+          <button type="button" class="btn ghost sm" id="mFavToggle" style="margin-top:8px;">☆ この内容を定番に登録</button>
         </div>`,
       onSave: (b) => {
         const name = b.querySelector('#mName').value.trim();
@@ -2637,6 +2963,53 @@ const MealModule = (() => {
     };
     ['#mP', '#mF', '#mC'].forEach(s => b.querySelector(s).oninput = calc);
     calc();
+
+    // ---- 食品DB検索 ----
+    const fill = item => {
+      b.querySelector('#mName').value = item.n || item.name;
+      b.querySelector('#mKcal').value = item.k ?? item.kcal;
+      b.querySelector('#mP').value = item.p; b.querySelector('#mF').value = item.f; b.querySelector('#mC').value = item.c;
+      b.querySelector('#mSearchResults').innerHTML = '';
+      b.querySelector('#mSearch').value = '';
+      calc(); updateFavBtn();
+    };
+    const searchIn = b.querySelector('#mSearch');
+    const resultsEl = b.querySelector('#mSearchResults');
+    searchIn.oninput = () => {
+      const q = searchIn.value.trim().toLowerCase();
+      if (!q) { resultsEl.innerHTML = ''; return; }
+      const hits = FOOD_DB.filter(x => x.n.toLowerCase().includes(q)).slice(0, 8);
+      resultsEl.innerHTML = hits.length
+        ? hits.map((x, i) => `<button type="button" class="food-row" data-food="${FOOD_DB.indexOf(x)}"><span>${escapeHTML(x.n)}</span><span class="food-kcal">${x.k}kcal · P${x.p}</span></button>`).join('')
+        : `<p class="hint" style="padding:6px 2px;">見つかりません。手入力するか、よく使うものは保存後「定番に登録」してください。</p>`;
+      resultsEl.querySelectorAll('[data-food]').forEach(btn => btn.onclick = () => fill(FOOD_DB[+btn.dataset.food]));
+    };
+
+    // ---- マイ定番 ----
+    const favBtn = b.querySelector('#mFavToggle');
+    const findFav = name => state.favorites.findIndex(fv => fv.name === name);
+    const updateFavBtn = () => {
+      const name = b.querySelector('#mName').value.trim();
+      favBtn.textContent = name && findFav(name) >= 0 ? '★ 定番から外す' : '☆ この内容を定番に登録';
+    };
+    const renderFavChips = () => {
+      b.querySelector('#mFavChips').innerHTML = state.favorites.slice(0, 8).map((fv, i) => `<button type="button" class="cat-chip" data-fav="${i}">★ ${escapeHTML(fv.name)}</button>`).join('');
+      b.querySelectorAll('[data-fav]').forEach(ch => ch.onclick = () => fill(state.favorites[+ch.dataset.fav]));
+    };
+    favBtn.onclick = () => {
+      const name = b.querySelector('#mName').value.trim();
+      if (!name) { toast('先にメニュー名を入力してください'); return; }
+      const idx = findFav(name);
+      if (idx >= 0) { state.favorites.splice(idx, 1); toast('定番から外しました'); }
+      else {
+        state.favorites.unshift({ name, kcal: numOrNull(b.querySelector('#mKcal').value) || 0, p: numOrNull(b.querySelector('#mP').value) || 0, f: numOrNull(b.querySelector('#mF').value) || 0, c: numOrNull(b.querySelector('#mC').value) || 0 });
+        state.favorites = state.favorites.slice(0, 20);
+        toast('定番に登録しました。次回からワンタップで入力できます');
+      }
+      Store.save(); renderFavChips(); updateFavBtn();
+    };
+    b.querySelector('#mName').addEventListener('input', updateFavBtn);
+    renderFavChips(); updateFavBtn();
   }
 
   function mockMealEstimate(fileName = '') {
@@ -2672,15 +3045,8 @@ const MealModule = (() => {
       },
     });
     const body = Modal.body;
-    body.querySelector('#photoInput').onchange = e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const est = mockMealEstimate(file.name);
-      body._estimate = est;
-      const img = body.querySelector('#photoPreview');
-      img.src = URL.createObjectURL(file);
-      img.style.display = '';
-      body.querySelector('#estimateArea').innerHTML = `
+    const renderEstimate = (area, est, note) => {
+      area.innerHTML = `
         <b>${escapeHTML(est.name)}</b>
         <div class="ex-sets" style="margin-top:8px;">
           <span class="set-chip"><b>${est.kcal}</b> kcal</span>
@@ -2688,7 +3054,44 @@ const MealModule = (() => {
           <span class="set-chip">F <b>${est.f}</b>g</span>
           <span class="set-chip">C <b>${est.c}</b>g</span>
         </div>
-        <p class="hint" style="margin-top:8px;">AI接続前の仮推定です。保存後に編集できます。</p>`;
+        <p class="hint" style="margin-top:8px;">${escapeHTML(note)}</p>`;
+    };
+    body.querySelector('#photoInput').onchange = async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = body.querySelector('#photoPreview');
+      img.src = URL.createObjectURL(file);
+      img.style.display = '';
+      const area = body.querySelector('#estimateArea');
+
+      if (!AI.enabled()) {
+        const est = mockMealEstimate(file.name);
+        body._estimate = est;
+        renderEstimate(area, est, '仮推定です（⚙設定でAI連携を有効にすると写真から自動解析します）。保存後に編集できます。');
+        return;
+      }
+      area.innerHTML = `<b>解析中…</b><br><span class="hint">写真をAIで解析しています（数秒かかります）</span>`;
+      try {
+        const imgBlock = await AI.fileToImageBlock(file);
+        const text = await AI.chat({
+          system: '食事写真の栄養推定を行うアシスタント。回答はJSONのみ。説明文・前置き・コードブロック記法は一切出力しない。',
+          messages: [{ role: 'user', content: [imgBlock, { type: 'text', text: '写真の食事内容と量を推定し、次の形式のJSONのみで返答: {"name":"料理名(日本語・20字以内)","kcal":数値,"p":タンパク質g,"f":脂質g,"c":炭水化物g}' }] }],
+          maxTokens: 300,
+        });
+        const j = AI.parseJSON(text);
+        const est = {
+          name: String(j.name || '写真の食事').slice(0, 30),
+          kcal: Math.max(0, Math.round(+j.kcal || 0)),
+          p: Math.max(0, round(+j.p || 0, 1)), f: Math.max(0, round(+j.f || 0, 1)), c: Math.max(0, round(+j.c || 0, 1)),
+        };
+        body._estimate = est;
+        renderEstimate(area, est, 'AI推定です。保存後に編集で微調整できます。');
+      } catch (err) {
+        console.error(err);
+        const est = mockMealEstimate(file.name);
+        body._estimate = est;
+        renderEstimate(area, est, `AI解析に失敗したため仮推定を表示しています（${err.message}）`);
+      }
     };
   }
 
@@ -2731,6 +3134,7 @@ const MealModule = (() => {
 const TrainerModule = (() => {
   const state = Store.ns('trainer', { messages: [] });
   let rootEl = null;
+  let thinking = false;
 
   function context() {
     return {
@@ -2746,7 +3150,7 @@ const TrainerModule = (() => {
     if (!state.messages.length) {
       state.messages.push({
         role: 'trainer',
-        text: 'こんにちは、TralogのAIトレーナーです。目標、食事、トレーニング、体組成の変化をまとめて見ながら提案します。まずは「今週のメニューを作って」など気軽に聞いてください。',
+        text: 'こんにちは、Tralogトレーナーです。あなたの記録（トレ・体組成・食事）を分析して提案します。まずは「今日のメニュー」ボタンを押してみてください。',
       });
       Store.save();
     }
@@ -2759,16 +3163,16 @@ const TrainerModule = (() => {
         <div class="trainer-screen">
           <div class="trainer-top">
             <button class="link-btn" type="button">‹</button>
-            <div class="trainer-name">Tralog Trainer</div>
+            <div class="trainer-name">Tralog Trainer <span class="ai-badge ${AI.enabled() ? '' : 'off'}">${AI.enabled() ? 'AI' : 'ローカル分析'}</span></div>
             <button class="btn ghost sm" id="clearChat">Clear</button>
           </div>
           <div class="quick-prompts" style="padding:10px 14px 0;margin:0;">
-            ${['今週のメニュー', '食事改善', '目標相談', '次の胸トレ', '体組成解説'].map(q => `<button class="btn ghost sm" data-prompt="${escapeHTML(q)}">${q}</button>`).join('')}
+            ${['今日のメニュー', '重量の伸び', '部位バランス', '食事チェック', '体組成の変化'].map(q => `<button class="btn ghost sm" data-prompt="${escapeHTML(q)}">${q}</button>`).join('')}
           </div>
-          <div class="chat-box" id="chatBox">${state.messages.map(renderMsg).join('')}</div>
+          <div class="chat-box" id="chatBox">${state.messages.map(renderMsg).join('')}${thinking ? `<div class="chat-msg"><div class="role">TRAINER</div><div class="text"><span class="typing"><i></i><i></i><i></i></span></div></div>` : ''}</div>
           <div class="chat-input-row">
             <textarea id="chatInput" rows="1" placeholder="Type message here..."></textarea>
-            <button class="btn" id="sendChat">送信</button>
+            <button class="btn" id="sendChat" ${thinking ? 'disabled' : ''}>${thinking ? '…' : '送信'}</button>
           </div>
         </div>
       </div>`;
@@ -2798,35 +3202,195 @@ const TrainerModule = (() => {
     </div>`;
   }
 
-  function send(text) {
-    state.messages.push({ role: 'user', text });
-    state.messages.push({ role: 'trainer', text: reply(text, context()) });
-    Store.save();
-    redraw();
-    const box = rootEl.querySelector('#chatBox');
+  function scrollBottom() {
+    const box = rootEl && rootEl.querySelector('#chatBox');
     if (box) box.scrollTop = box.scrollHeight;
+  }
+
+  function systemPrompt(ctx) {
+    const p = ctx.user.profile || {};
+    return [
+      'あなたは「Tralog Trainer」。日本語で答えるパーソナルトレーナーAI。',
+      '口調は前向きで簡潔。回答は基本300字以内。必要なときだけ番号付きリスト(3項目まで)を使う。',
+      '医療的な診断はしない。痛み・怪我・体調不良が疑われる相談には医療機関の受診を勧める。',
+      '以下はアプリに記録されたユーザーの最新データ。提案は必ずこのデータを踏まえ、数値に言及して具体的にする。',
+      `# プロフィール: 目標=${p.goal || '未設定'} / 身長=${p.heightCm || '?'}cm / 年齢=${p.age || '?'} / 性別=${p.sex || '未設定'} / 運動頻度=${p.activity || '未設定'}`,
+      `# トレーニング: 総記録${ctx.workout.totalRecords || 0}件 / 累計ボリューム${ctx.workout.volume || 0}kg / 最終実施日=${ctx.workout.latest || 'なし'} / よく行う種目=${(ctx.workout.menus || []).map(m => `${m.menuName}(${m.count}回)`).join('、') || 'なし'}`,
+      `# 体組成(最新): 体重${ctx.body.weight ?? '?'}kg / 体脂肪率${ctx.body.bodyFat ?? '?'}% / 骨格筋量${ctx.body.smm ?? '?'}kg`,
+      `# 今日の食事: ${Math.round(ctx.meal.totals?.kcal || 0)}kcal（目標${ctx.meal.targets?.kcal || '?'}kcal） / P${Math.round(ctx.meal.totals?.p || 0)}g F${Math.round(ctx.meal.totals?.f || 0)}g C${Math.round(ctx.meal.totals?.c || 0)}g`,
+    ].join('\n');
+  }
+
+  async function send(text) {
+    if (thinking) return;
+    state.messages.push({ role: 'user', text });
+    Store.save();
+
+    // AI未設定時は従来のルールベース応答（オフラインフォールバック）
+    if (!AI.enabled()) {
+      state.messages.push({ role: 'trainer', text: reply(text, context()) });
+      Store.save(); redraw(); scrollBottom();
+      return;
+    }
+
+    thinking = true; redraw(); scrollBottom();
+    try {
+      const hist = state.messages
+        .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
+        .slice(-12);
+      while (hist.length && hist[0].role !== 'user') hist.shift();
+      const answer = await AI.chat({ system: systemPrompt(context()), messages: hist, maxTokens: 1024 });
+      state.messages.push({ role: 'trainer', text: answer || '（応答が空でした。もう一度お試しください）' });
+    } catch (e) {
+      console.error(e);
+      state.messages.push({ role: 'trainer', text: reply(text, context()) + `\n\n──\nAI接続に失敗したため簡易応答を表示しています（${e.message}）` });
+    }
+    thinking = false;
+    Store.save(); redraw(); scrollBottom();
+  }
+
+  /* ============ ルールエンジン（API不要・完全ローカル） ============ */
+  const catName = id => catById(id).name;
+  const fmtKg = v => (v % 1 ? v.toFixed(1) : String(v));
+
+  function planReply() {
+    const a = WorkoutModule.analysis();
+    const cats = Object.entries(a.catStats).filter(([id]) => id !== 'cardio' && id !== 'other');
+    if (!cats.length) return 'まだトレーニング記録が無いので、まずは今日の記録を1件付けてみましょう。記録が増えるほど「前回◯kgだったから次は…」という具体的な提案ができるようになります。';
+    const sorted = cats.sort((x, y) => String(x[1].lastDate).localeCompare(String(y[1].lastDate)));
+    const targets = sorted.slice(0, 2);
+    const lines = [`今日のおすすめ部位は「${targets.map(([id]) => catName(id)).join('・')}」です（前回から最も日数が空いています）。`, ''];
+    targets.forEach(([id, st]) => {
+      lines.push(`■ ${catName(id)}（前回: ${st.lastDate}）`);
+      const menus = a.progress.filter(p => p.category === id).slice(0, 3);
+      if (!menus.length) lines.push('・履歴なし。基本種目を8〜12回×3セットから。');
+      menus.forEach(p => {
+        const adv = p.advice === 'up' ? `→ ${fmtKg(p.nextWeight)}kgに挑戦（前回は全セット10回以上クリア）`
+          : p.advice === 'down' ? `→ ${fmtKg(p.nextWeight)}kg程度に下げてフォームと回数を優先`
+          : '→ 同重量で「前回+1回」を狙う';
+        lines.push(`・${p.name}: 前回 ${fmtKg(p.last.topWeight)}kg × ${p.last.sets}セット ${adv}`);
+      });
+      lines.push('');
+    });
+    lines.push('レストは中〜高重量で90〜120秒が目安。記録画面のレストタイマーが使えます。');
+    return lines.join('\n');
+  }
+
+  function progressionReply() {
+    const a = WorkoutModule.analysis();
+    if (!a.progress.length) return '記録がまだ無いため伸びを判定できません。同じ種目を2回以上記録すると、重量の伸び・停滞を自動でチェックできます。';
+    const lines = ['直近の種目別チェックです（推定1RM = 重量×回数から算出）。', ''];
+    a.progress.slice(0, 4).forEach(p => {
+      const diff = p.prev ? round(p.last.e1rm - p.prev.e1rm, 1) : null;
+      const arrow = diff == null ? '（初回）' : diff > 0 ? `↑ +${diff}kg` : diff < 0 ? `↓ ${diff}kg` : '→ 横ばい';
+      lines.push(`・${p.name}: e1RM ${p.last.e1rm}kg ${arrow}`);
+    });
+    if (a.stagnant.length) {
+      lines.push('', `⚠ 3週間以上停滞: ${a.stagnant.map(x => x.name).join('、')}`);
+      lines.push('対策は3択です。1) 1週間だけ重量を10%落として回数を増やす（ディロード） 2) セット数を+1する 3) 種目のバリエーションを変える。まず1つだけ試しましょう。');
+    } else {
+      lines.push('', '停滞している種目はありません。全セットで規定回数（10回）をクリアした種目から+2.5kgしていきましょう。');
+    }
+    return lines.join('\n');
+  }
+
+  function volumeReply() {
+    const a = WorkoutModule.analysis();
+    const entries = Object.entries(a.catStats).filter(([id]) => id !== 'other');
+    if (!entries.length) return '記録がまだ無いため部位バランスを分析できません。';
+    const lines = ['直近7日の部位別ボリューム（前週比）:', ''];
+    entries.sort((x, y) => y[1].vol7 - x[1].vol7).forEach(([id, st]) => {
+      if (id === 'cardio') { lines.push(`・${catName(id)}: ${st.count7}回`); return; }
+      const diff = st.vol7 - st.vol7prev;
+      const arrow = st.vol7prev === 0 && st.vol7 === 0 ? '—' : diff > 0 ? `↑ +${round(diff, 0)}kg` : diff < 0 ? `↓ ${round(diff, 0)}kg` : '→';
+      lines.push(`・${catName(id)}: ${round(st.vol7, 0)}kg ${arrow}`);
+    });
+    const today = dateKey(new Date());
+    const neglected = entries.filter(([id, st]) => {
+      if (id === 'cardio' || !st.lastDate) return false;
+      return (new Date(today) - new Date(st.lastDate)) / 86400000 >= 7;
+    });
+    if (neglected.length) lines.push('', `⚠ 7日以上触れていない部位: ${neglected.map(([id]) => catName(id)).join('、')}。次回はここを優先しましょう。`);
+    else lines.push('', '全部位まんべんなく回せています。この調子です💪');
+    return lines.join('\n');
+  }
+
+  function mealReply(ctx) {
+    const t = ctx.meal.totals, tg = ctx.meal.targets;
+    const kcalGap = Math.round((tg.kcal || 0) - (t.kcal || 0));
+    const lines = [`今日の摂取: ${Math.round(t.kcal)}kcal / 目標${tg.kcal}kcal（${kcalGap >= 0 ? `残り${kcalGap}` : `${-kcalGap}超過`}kcal）`, `P ${Math.round(t.p)}g / F ${Math.round(t.f)}g / C ${Math.round(t.c)}g`, ''];
+    const bw = ctx.body.weight;
+    if (bw) {
+      const pMin = Math.round(bw * 1.6), pMax = Math.round(bw * 2.2);
+      const pGap = pMin - Math.round(t.p);
+      lines.push(`体重${bw}kgならタンパク質の目安は1日${pMin}〜${pMax}g。`);
+      lines.push(pGap > 0
+        ? `あと${pGap}g前後欲しいところです。目安: 鶏むね100gでP約23g / 卵1個でP約6g / プロテイン1杯でP約20g。`
+        : 'タンパク質は足りています👍');
+    } else {
+      lines.push('体組成タブで体重を記録すると、体重ベースのタンパク質目安も計算できます。');
+    }
+    const goal = ctx.user.profile.goal || '';
+    if (goal.includes('脂肪') && kcalGap < 0) lines.push('', '減量目標に対して超過気味です。夕食の主食を半分にするか、脂質の多いメニューを1品置き換えるのが現実的です。');
+    if (goal.includes('筋肉') && kcalGap > 400) lines.push('', '増量目標に対して不足気味です。トレーニング後に炭水化物+タンパク質を1食分追加しましょう。');
+    return lines.join('\n');
+  }
+
+  function bodyReply(ctx) {
+    const tr = BodyModule.trend();
+    if (!tr) return `体組成の記録がまだ${ctx.body.count || 0}件です。2件以上あると変化のペースを分析できます。週1回・同じ時間帯の測定がおすすめです。`;
+    const f = (label, d, unit, goodDir) => {
+      if (d == null) return null;
+      const arrow = d > 0 ? '+' : '';
+      const judge = d === 0 ? '維持' : (goodDir === 0 ? '' : (d * goodDir > 0 ? '👍' : '注意'));
+      return `・${label}: ${arrow}${d}${unit}（${tr.days}日間） ${judge}`;
+    };
+    const goal = ctx.user.profile.goal || '';
+    const wantLoss = goal.includes('脂肪') || goal.includes('減');
+    const lines = [`${tr.base.date} → ${tr.last.date} の変化:`, ''];
+    [f('体重', tr.dWeight, 'kg', wantLoss ? -1 : 0), f('体脂肪率', tr.dFat, '%', -1), f('骨格筋量', tr.dSmm, 'kg', 1)].forEach(x => x && lines.push(x));
+    if (tr.dWeight != null) {
+      const weekly = round(tr.dWeight / tr.days * 7, 2);
+      lines.push('', `週あたり${weekly > 0 ? '+' : ''}${weekly}kgペース。${wantLoss
+        ? (weekly <= -1 ? '減量ペースが速すぎます。筋肉も落ちやすいので週-0.5kg前後に緩めましょう。' : weekly < 0 ? '週-0.5kg前後の理想的な減量ペースです。' : '減っていません。摂取を1日200〜300kcal下げて2週間様子を見ましょう。')
+        : (weekly > 0.5 ? '増量ペースがやや速め。脂肪が乗りやすいので週+0.2〜0.4kgに。' : weekly > 0 ? '良い増量ペースです。' : '増えていません。1日+200kcalから調整を。')}`);
+    }
+    return lines.join('\n');
+  }
+
+  function recoveryReply() {
+    const a = WorkoutModule.analysis();
+    if (a.daysSince == null) return 'まだ記録が無いので疲労評価はできませんが、始めたては「週2回・全身」から入るのが続けやすいです。';
+    const lines = [];
+    if (a.daysSince === 0) lines.push('今日はすでにトレーニング済みです。よく頑張りました💪');
+    else lines.push(`最後のトレーニングから${a.daysSince}日経過。直近7日の実施は${a.trainedDays7}日です。`);
+    if (a.trainedDays7 >= 6) lines.push('', '頻度がかなり高めです。意図的な休養日を1日入れると、挙上重量はむしろ伸びやすくなります。睡眠7時間を優先しましょう。');
+    else if (a.daysSince >= 4) lines.push('', '少し間が空いています。再開初日は前回の重量の90%程度から入ると、関節への負担なく戻せます。');
+    else lines.push('', '良いリズムです。疲労が抜けない場合は、重量ではなくセット数を先に減らすのがコツです。');
+    return lines.join('\n');
+  }
+
+  function helpReply(ctx) {
+    const a = WorkoutModule.analysis();
+    const goal = ctx.user.profile.goal || '目標未設定';
+    return [`現在の目標は「${goal}」。直近7日は${a.trainedDays7}日トレーニングしています。`, '',
+      '下のボタンか、こんな聞き方で相談できます。',
+      '・「今日のメニュー」→ 空いてる部位と前回重量から提案',
+      '・「重量の伸び」→ 種目別のe1RM推移と停滞チェック',
+      '・「部位バランス」→ 週間ボリュームの偏り分析',
+      '・「食事チェック」→ カロリー/タンパク質の過不足',
+      '・「体組成の変化」→ 減量・増量ペースの判定'].join('\n');
   }
 
   function reply(text, ctx) {
     const q = text.toLowerCase();
-    const goal = ctx.user.profile.goal || '目標未設定';
-    const height = ctx.user.profile.heightCm ? `身長${ctx.user.profile.heightCm}cm` : '身長未設定';
-    const kcalGap = Math.round((ctx.meal.targets.kcal || 0) - (ctx.meal.totals.kcal || 0));
-
-    if (/食|カロリー|pfc|meal|kcal/.test(q)) {
-      return `今日の摂取は約${Math.round(ctx.meal.totals.kcal)}kcalです。目標との差は${kcalGap >= 0 ? '残り' : '超過'}${Math.abs(kcalGap)}kcal。\n\n${goal.includes('脂肪') ? '減量寄りなら、タンパク質を優先して脂質を少し抑えましょう。' : '筋肉を増やすなら、トレーニング後に炭水化物とタンパク質をセットで入れるのがおすすめです。'}\n写真推定は今は仮実装なので、保存後に数値を微調整してください。`;
-    }
-    if (/メニュー|トレ|胸|腕|肩|背中|脚|お尻|腹筋|workout/.test(q)) {
-      const top = ctx.workout.menus?.[0]?.menuName || 'スクワット';
-      return `${goal}に合わせた提案です。\n\n1. メイン種目: ${top} 3〜4セット\n2. 補助種目: 苦手部位を2種目、各10〜12回\n3. 仕上げ: 体幹 or 有酸素 10〜15分\n\n直近の記録が増えるほど、前回重量や疲労を踏まえた提案にできます。`;
-    }
-    if (/体組成|体重|体脂肪|筋肉|inbody/.test(q)) {
-      return `現在の体組成メモです。\n\n最新: 体重 ${ctx.body.weight ?? '-'}kg / 体脂肪率 ${ctx.body.bodyFat ?? '-'}% / 骨格筋量 ${ctx.body.smm ?? '-'}kg\n${height}\n\n変化が少ない時は、トレーニング強度・摂取カロリー・睡眠のどれかを1つだけ調整するのがおすすめです。`;
-    }
-    if (/目標|goal|どう/.test(q)) {
-      return `今の目標は「${goal}」ですね。\n\nまず見るべき指標は3つです。\n1. 週のトレーニング頻度\n2. 体重・体脂肪率・骨格筋量の方向\n3. 摂取カロリーとタンパク質量\n\n次に「いつまでに」「どれくらい」を入れると、週単位の行動目標まで落とし込めます。`;
-    }
-    return `相談ありがとうございます。\n\n今の設定は「${goal}」、${height}です。トレーニング・食事・体組成のどれを優先して変えたいか教えてください。具体的には「今週3回行ける」「体脂肪を落としたい」「夕食が重くなりがち」などでOKです。`;
+    if (/停滞|伸び|重量|1rm|強度|漸進|きろく.*のび/.test(q)) return progressionReply();
+    if (/バランス|ボリューム|部位|頻度|偏/.test(q)) return volumeReply();
+    if (/食|カロリー|pfc|タンパク|kcal|栄養/.test(q)) return mealReply(ctx);
+    if (/体組成|体重|体脂肪|筋肉量|inbody|ペース/.test(q)) return bodyReply(ctx);
+    if (/休|回復|疲れ|オーバーワーク|だる/.test(q)) return recoveryReply();
+    if (/メニュー|プラン|何(を|)やる|作って|おすすめ|今日/.test(q)) return planReply();
+    return helpReply(ctx);
   }
 
   return { id: 'trainer', label: 'トレーナー', icon: FLAT_ICONS.trainer, render };
